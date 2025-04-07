@@ -13,6 +13,7 @@ version = "1.0.0"
 tasks.named<Jar>("jar") {
     archiveClassifier.set("") // plain 제거, 기본 jar 이름으로 설정
 }
+
 tasks.getByName<BootJar>("bootJar") {
     enabled = false
 }
@@ -40,10 +41,7 @@ tasks.test {
 
 publishing {
     publications {
-        create<MavenPublication>("maven") {
-            groupId = "com.github.pjh612"
-            artifactId = "alert"
-            version = "1.0.0"
+        create<MavenPublication>("mavenJava") {
             from(components["java"])
         }
     }
