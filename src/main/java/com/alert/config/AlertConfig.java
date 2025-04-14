@@ -1,11 +1,10 @@
 package com.alert.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alert.cache.AlertCacheManager;
 import com.alert.core.manager.AlertManager;
 import com.alert.core.manager.SubscribableAlertManager;
 import com.alert.core.messaging.bridge.AlertMessageBroadcastHandler;
-import com.alert.core.messaging.bridge.MessagePublisher;
+import com.alert.core.messaging.bridge.AlertMessagePublisher;
 import com.alert.core.messaging.bridge.TopicAlertMessageHandler;
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
 import com.alert.core.messaging.model.AlertMessageFactory;
@@ -15,6 +14,7 @@ import com.alert.core.messaging.sender.AlertMessageSender;
 import com.alert.sse.EmitterRepository;
 import com.alert.sse.SseAlertManager;
 import com.alert.sse.SseAlertMessageSender;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -30,16 +30,16 @@ public class AlertConfig {
     @ConditionalOnMissingBean(AlertManager.class)
     public SubscribableAlertManager<SseEmitter> defaultAlertManager(
             EmitterRepository emitterRepository,
-            AlertCacheManager<DefaultAlertMessage> alertCacheManager,
-            AlertMessageFactory<DefaultAlertMessage> alertMessageConverter,
-            MessagePublisher<DefaultAlertMessage> messagePublisher
+            AlertCacheManager alertCacheManager,
+            AlertMessageFactory alertMessageConverter,
+            AlertMessagePublisher alertMessagePublisher
     ) {
-        return new SseAlertManager<>(messagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, DefaultAlertMessage.class);
+        return new SseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, DefaultAlertMessage.class);
     }
 
     @Bean
     @ConditionalOnMissingBean(AlertMessageFactory.class)
-    public AlertMessageFactory<?> alertMessageFactory() {
+    public AlertMessageFactory alertMessageFactory() {
         return new DefaultAlertMessageFactory();
     }
 

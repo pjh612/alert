@@ -8,20 +8,20 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.MessageListener;
 
-public class KafkaMessageConsumerRegistrar<T extends AlertMessage> implements MessageConsumerRegistrar {
-    private final ConcurrentKafkaListenerContainerFactory<String, T> kafkaListenerContainerFactory;
+public class KafkaMessageConsumerRegistrar implements MessageConsumerRegistrar {
+    private final ConcurrentKafkaListenerContainerFactory<String, AlertMessage> kafkaListenerContainerFactory;
     private final GenericApplicationContext context;
 
-    public KafkaMessageConsumerRegistrar(ConcurrentKafkaListenerContainerFactory<String, T> kafkaListenerContainerFactory, ApplicationContext context) {
+    public KafkaMessageConsumerRegistrar(ConcurrentKafkaListenerContainerFactory<String, AlertMessage> kafkaListenerContainerFactory, ApplicationContext context) {
         this.kafkaListenerContainerFactory = kafkaListenerContainerFactory;
         this.context = (GenericApplicationContext) context;
     }
 
     @Override
     public void register(String topic, TopicAlertMessageHandler messageHandler) {
-        ConcurrentMessageListenerContainer<String, T> container = kafkaListenerContainerFactory.createContainer(topic);
+        ConcurrentMessageListenerContainer<String, AlertMessage> container = kafkaListenerContainerFactory.createContainer(topic);
         ContainerProperties containerProperties = container.getContainerProperties();
-        containerProperties.setMessageListener((MessageListener<String, T>) record ->
+        containerProperties.setMessageListener((MessageListener<String, AlertMessage>) record ->
                 messageHandler.handle(record.topic(), record.value())
         );
 

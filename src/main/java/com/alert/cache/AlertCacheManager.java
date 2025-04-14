@@ -1,9 +1,11 @@
 package com.alert.cache;
 
+import com.alert.core.messaging.model.AlertMessage;
+
 import java.util.List;
 
-public interface AlertCacheManager<T> {
-    Boolean save(String key, String id, T value);
+public interface AlertCacheManager {
+    Boolean save(String key, String id, AlertMessage value);
 
-    List<T> getFromOffset(String key, Long offset, Class<T> tClass);
+    List<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass);
 }

@@ -1,5 +1,6 @@
 package com.alert.cache;
 
+import com.alert.core.messaging.model.AlertMessage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -10,7 +11,7 @@ import java.util.List;
 import java.util.Set;
 
 @Component
-public class RedisAlertCacheManager<T> implements AlertCacheManager<T> {
+public class RedisAlertCacheManager implements AlertCacheManager {
     private final RedisTemplate<String, String> messageCache;
     private final ObjectMapper objectMapper;
 
@@ -20,7 +21,7 @@ public class RedisAlertCacheManager<T> implements AlertCacheManager<T> {
     }
 
     @Override
-    public Boolean save(String key, String id, T value) {
+    public Boolean save(String key, String id, AlertMessage value) {
         try {
             return messageCache.opsForZSet().add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id));
         } catch (JsonProcessingException e) {
@@ -29,7 +30,7 @@ public class RedisAlertCacheManager<T> implements AlertCacheManager<T> {
     }
 
     @Override
-    public List<T> getFromOffset(String key, Long offset, Class<T> tClass) {
+    public List<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass) {
         Set<ZSetOperations.TypedTuple<String>> typedTuples = messageCache.opsForZSet().rangeByScoreWithScores(key, offset + 1, Double.MAX_VALUE);
         double maxOffset = typedTuples.stream()
                 .mapToDouble(ZSetOperations.TypedTuple::getScore)

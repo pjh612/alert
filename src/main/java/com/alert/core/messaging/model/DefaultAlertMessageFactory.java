@@ -1,6 +1,6 @@
 package com.alert.core.messaging.model;
 
-public class DefaultAlertMessageFactory implements AlertMessageFactory<DefaultAlertMessage> {
+public class DefaultAlertMessageFactory implements AlertMessageFactory {
 
     @Override
     public DefaultAlertMessage onConnect(String targetId) {

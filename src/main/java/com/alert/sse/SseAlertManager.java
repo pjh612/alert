@@ -3,7 +3,7 @@ package com.alert.sse;
 import com.alert.cache.AlertCacheManager;
 import com.alert.core.manager.AbstractAlertManager;
 import com.alert.core.manager.SubscribableAlertManager;
-import com.alert.core.messaging.bridge.MessagePublisher;
+import com.alert.core.messaging.bridge.AlertMessagePublisher;
 import com.alert.core.messaging.model.AlertChannel;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.AlertMessageFactory;
@@ -12,16 +12,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-public class SseAlertManager<T extends AlertMessage> extends AbstractAlertManager<T> implements SubscribableAlertManager<SseEmitter> {
+public class SseAlertManager extends AbstractAlertManager implements SubscribableAlertManager<SseEmitter> {
     private final EmitterRepository emitterRepository;
-    private final AlertCacheManager<T> alertCacheManager;
-    private final Class<T> messageType;
+    private final AlertCacheManager alertCacheManager;
+    private final Class<? extends AlertMessage> messageType;
 
     private static final Logger log = LoggerFactory.getLogger(SseAlertManager.class);
     private static final String ALERT_KEY_FORMAT = "alert:%s";
 
-    public SseAlertManager(MessagePublisher<T> messagePublisher, AlertMessageFactory<T> alertMessageFactory, EmitterRepository emitterRepository, AlertCacheManager<T> alertCacheManager, Class<T> messageType) {
-        super(alertMessageFactory, messagePublisher);
+    public SseAlertManager(AlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, EmitterRepository emitterRepository, AlertCacheManager alertCacheManager, Class<? extends AlertMessage> messageType) {
+        super(alertMessageFactory, alertMessagePublisher);
         this.emitterRepository = emitterRepository;
         this.alertCacheManager = alertCacheManager;
         this.messageType = messageType;
@@ -37,8 +37,8 @@ public class SseAlertManager<T extends AlertMessage> extends AbstractAlertManage
         emitter.onCompletion(() -> cleanUpEmitter(subscriberId));
         emitter.onError(e -> handleEmitterError(subscriberId, e));
 
-        T alertMessage = alertMessageFactory.onConnect(subscriberId);
-        messagePublisher.publish(alertChannel.name(), alertMessage);
+        AlertMessage alertMessage = alertMessageFactory.onConnect(subscriberId);
+        alertMessagePublisher.publish(alertChannel.name(), alertMessage);
         if (isReconnected(lastEventId)) {
             republishMissedMessages(alertChannel, subscriberId, lastEventId);
         }
@@ -65,7 +65,7 @@ public class SseAlertManager<T extends AlertMessage> extends AbstractAlertManage
             alertCacheManager.getFromOffset(key, offset, messageType)
                     .stream()
                     .map(it -> alertMessageFactory.onReplayMessage(subscriberId, it))
-                    .forEach(it -> messagePublisher.publish(alertChannel.name(), it));
+                    .forEach(it -> alertMessagePublisher.publish(alertChannel.name(), it));
         }
     }
 
