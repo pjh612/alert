@@ -20,6 +20,9 @@ public class AlertMessageBroadcastHandler implements TopicAlertMessageHandler {
     @Override
     public void handle(String topic, AlertMessage message) {
         try {
+            if (log.isTraceEnabled()) {
+                log.trace("[AlertMessageBroadcastHandler] handle message {}", message);
+            }
             messageBroadcaster.sendMessage(topic, objectMapper.writeValueAsString(message));
         } catch (Exception e) {
             log.error("Failed to send notification: {}", e.getMessage());

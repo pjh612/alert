@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alert"
-version = "1.0.1"
+version = "1.1.0"
 
 tasks.named<Jar>("jar") {
     archiveClassifier.set("") // plain 제거, 기본 jar 이름으로 설정
@@ -26,9 +26,12 @@ repositories {
 }
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    compileOnly("org.springframework.boot:spring-boot-starter-web")
+    compileOnly("org.springframework.boot:spring-boot-starter-webflux")
+    compileOnly("org.springframework.boot:spring-boot-starter-data-redis")
+    compileOnly("org.springframework.boot:spring-boot-starter-data-redis-reactive")
     implementation("org.springframework.kafka:spring-kafka")
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("io.projectreactor.kafka:reactor-kafka:1.3.23")
     implementation("net.gpedro.integrations.slack:slack-webhook:1.4.0")
     implementation("org.springframework.boot:spring-boot-autoconfigure")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
