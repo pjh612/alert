@@ -1,11 +1,10 @@
 package com.alert.cache;
 
 import com.alert.core.messaging.model.AlertMessage;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Set;
@@ -22,11 +21,7 @@ public class RedisAlertCacheManager implements AlertCacheManager {
 
     @Override
     public Boolean save(String key, String id, AlertMessage value) {
-        try {
-            return messageCache.opsForZSet().add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return messageCache.opsForZSet().add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id));
     }
 
     @Override
@@ -40,13 +35,7 @@ public class RedisAlertCacheManager implements AlertCacheManager {
 
         return typedTuples
                 .stream()
-                .map(it -> {
-                    try {
-                        return objectMapper.readValue(it.getValue(), tClass);
-                    } catch (JsonProcessingException e) {
-                        throw new RuntimeException(e);
-                    }
-                })
+                .map(it -> objectMapper.readValue(it.getValue(), tClass))
                 .toList();
 
     }

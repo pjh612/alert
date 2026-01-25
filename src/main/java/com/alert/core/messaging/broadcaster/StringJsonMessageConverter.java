@@ -1,8 +1,7 @@
 package com.alert.core.messaging.broadcaster;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
+import tools.jackson.databind.ObjectMapper;
 
 public class StringJsonMessageConverter<O> implements MessageConverter<String, O> {
     private final ObjectMapper objectMapper;
@@ -16,10 +15,6 @@ public class StringJsonMessageConverter<O> implements MessageConverter<String, O
 
     @Override
     public O convert(String input) {
-        try {
-            return objectMapper.readValue(input, targetType);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to deserialize message", e);
-        }
+        return objectMapper.readValue(input, targetType);
     }
 }

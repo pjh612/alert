@@ -8,7 +8,6 @@ import com.alert.core.messaging.broadcaster.*;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.sender.AlertMessageSender;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +21,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 

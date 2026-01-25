@@ -1,10 +1,10 @@
 package com.alert.core.messaging.bridge;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
 import com.alert.core.messaging.model.AlertMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
 
 public class AlertMessageBroadcastHandler implements TopicAlertMessageHandler {
     private final MessageBroadcaster<String> messageBroadcaster;

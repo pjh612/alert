@@ -1,8 +1,6 @@
 package com.alert.cache;
 
 import com.alert.core.messaging.model.AlertMessage;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Range;
@@ -10,6 +8,7 @@ import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -27,11 +26,7 @@ public class ReactiveRedisAlertCacheManager implements ReactiveAlertCacheManager
 
     @Override
     public Mono<Boolean> save(String key, String id, AlertMessage value) {
-        try {
-            return redisTemplate.opsForZSet().add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return redisTemplate.opsForZSet().add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id));
     }
 
     @Override
@@ -58,14 +53,7 @@ public class ReactiveRedisAlertCacheManager implements ReactiveAlertCacheManager
         return redisTemplate.opsForZSet()
                 .removeRangeByScore(key, Range.of(Range.Bound.inclusive(0.0), Range.Bound.inclusive(maxOffset)))
                 .thenMany(Flux.fromIterable(typedTuples))
-                .flatMap(typedTuple -> {
-                    try {
-                        return Mono.just(objectMapper.readValue(typedTuple.getValue(), tClass));
-                    } catch (JsonProcessingException e) {
-                        log.error("Error deserializing Redis value: {}", e.getMessage(), e);
-                        return Mono.empty();
-                    }
-                });
+                .flatMap(typedTuple -> Mono.just(objectMapper.readValue(typedTuple.getValue(), tClass)));
     }
 
     private double getMaxOffset(Long offset, List<ZSetOperations.TypedTuple<String>> typedTuples) {

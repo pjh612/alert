@@ -14,18 +14,22 @@ import com.alert.core.messaging.model.AlertMessageFactory;
 import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessageFactory;
 import com.alert.core.messaging.sender.AlertMessageSender;
-import com.alert.sse.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alert.sse.EmitterRepository;
+import com.alert.sse.ReactiveEmitterRepository;
+import com.alert.sse.ReactiveSseAlertManager;
+import com.alert.sse.ReactiveSseAlertMessageSender;
+import com.alert.sse.SseAlertManager;
+import com.alert.sse.SseAlertMessageSender;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.ObjectMapper;
 
 @EnableConfigurationProperties(AlertProperties.class)
 @Import({EmitterRepositoryConfig.class, AlertRedisConfig.class, AlertKafkaConfig.class})
