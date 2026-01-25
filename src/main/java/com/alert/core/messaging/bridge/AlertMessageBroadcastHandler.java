@@ -25,7 +25,7 @@ public class AlertMessageBroadcastHandler implements TopicAlertMessageHandler {
             }
             messageBroadcaster.sendMessage(topic, objectMapper.writeValueAsString(message));
         } catch (Exception e) {
-            log.error("Failed to send notification: {}", e.getMessage());
+            log.error("Failed to send notification: {}", e.getMessage(), e);
         }
     }
 }

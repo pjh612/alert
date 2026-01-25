@@ -5,10 +5,13 @@ import com.alert.core.messaging.bridge.AlertMessagePublisher;
 import com.alert.core.messaging.bridge.KafkaMessageConsumerRegistrar;
 import com.alert.core.messaging.bridge.KafkaMessagePublisher;
 import com.alert.core.messaging.bridge.MessageConsumerRegistrar;
+import com.alert.core.messaging.bridge.ReactiveAlertMessageBroadcastHandler;
 import com.alert.core.messaging.bridge.ReactiveAlertMessagePublisher;
 import com.alert.core.messaging.bridge.ReactiveKafkaAlertMessagePublisher;
 import com.alert.core.messaging.bridge.ReactiveKafkaMessageConsumerRegistrar;
+import com.alert.core.messaging.bridge.ReactiveMessageConsumerRegistrar;
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
+import com.alert.core.messaging.broadcaster.ReactiveMessageBroadcaster;
 import com.alert.core.messaging.model.AlertMessage;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -132,18 +135,18 @@ public class AlertKafkaConfig {
     @Bean
     @ConditionalOnMissingBean(MessageConsumerRegistrar.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
-    public MessageConsumerRegistrar reactiveMessageConsumerRegistrar(MessageBroadcaster<String> messageBroadcaster, ObjectMapper objectMapper, @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
+    public <T> ReactiveMessageConsumerRegistrar<T> reactiveMessageConsumerRegistrar(ReactiveMessageBroadcaster<String, T> messageBroadcaster, ObjectMapper objectMapper, @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, alertProperties.groupId());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
-        ReactiveKafkaMessageConsumerRegistrar kafkaMessageConsumerRegistrar = new ReactiveKafkaMessageConsumerRegistrar(props);
+        ReactiveKafkaMessageConsumerRegistrar<T> kafkaMessageConsumerRegistrar = new ReactiveKafkaMessageConsumerRegistrar<>(props);
 
         List<String> topics = alertProperties.topics();
         for (String topic : topics) {
-            kafkaMessageConsumerRegistrar.register(topic, new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper));
+            kafkaMessageConsumerRegistrar.register(topic, new ReactiveAlertMessageBroadcastHandler<>(messageBroadcaster, objectMapper), alertProperties.concurrency());
         }
 
         return kafkaMessageConsumerRegistrar;

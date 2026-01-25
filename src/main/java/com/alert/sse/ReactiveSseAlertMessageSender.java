@@ -1,28 +1,21 @@
 package com.alert.sse;
 
 import com.alert.core.messaging.model.AlertMessage;
-import com.alert.core.messaging.sender.AlertMessageSender;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Sinks;
 
-public class ReactiveSseAlertMessageSender implements AlertMessageSender {
-    private final ReactiveEmitterRepository emitterRepository;
+public class ReactiveSseAlertMessageSender extends AbstractAlertMessageSender<Sinks.Many<ServerSentEvent<Object>>> {
 
-    public ReactiveSseAlertMessageSender(ReactiveEmitterRepository emitterRepository) {
-        this.emitterRepository = emitterRepository;
+    public ReactiveSseAlertMessageSender(TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository) {
+        super(repository);
     }
 
     @Override
-    public void send(String id, AlertMessage message) {
-        Sinks.Many<ServerSentEvent<Object>> emitter = emitterRepository.getById(message.targetId());
-        if (emitter == null) {
-            return;
-        }
-        emitter.tryEmitNext(ServerSentEvent.builder()
+    protected void doSend(Sinks.Many<ServerSentEvent<Object>> engine, String id, AlertMessage message) {
+        engine.tryEmitNext(ServerSentEvent.builder()
                 .event(message.type().toString())
                 .data(message.body())
                 .id(id)
                 .build());
-
     }
 }

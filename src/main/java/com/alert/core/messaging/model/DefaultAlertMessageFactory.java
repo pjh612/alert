@@ -1,19 +1,41 @@
 package com.alert.core.messaging.model;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 public class DefaultAlertMessageFactory implements AlertMessageFactory {
 
     @Override
-    public DefaultAlertMessage onConnect(String targetId) {
-        return new DefaultAlertMessage(targetId, DefaultAlertMessageType.CONNECT, "connected", false);
+    public AlertMessage onConnect(String subscriberId, Map<String, String> attributes) {
+        return new DefaultAlertMessage(
+                UUID.randomUUID().toString(),
+                List.of(AlertTarget.id(subscriberId)),
+                DefaultAlertMessageType.CONNECT,
+                "connected",
+                false,
+                attributes
+        );
     }
 
     @Override
-    public DefaultAlertMessage onReplayMessage(String targetId, Object message) {
-        return new DefaultAlertMessage(targetId, DefaultAlertMessageType.MESSAGE, message, false);
+    public AlertMessage onReplay(String subscriberId, AlertMessage original, Map<String, String> attributes) {
+        return new DefaultAlertMessage(
+                UUID.randomUUID().toString(),
+                List.of(AlertTarget.id(subscriberId)),
+                original.type(),
+                original.body(),
+                true,
+                attributes
+        );
     }
 
     @Override
-    public DefaultAlertMessage onMessage(String targetId, Object message) {
-        return new DefaultAlertMessage(targetId, DefaultAlertMessageType.MESSAGE, message, false);
+    public AlertMessage create(List<AlertTarget> targets, AlertMessageType type, Object body, Map<String, String> attributes) {
+        return new DefaultAlertMessage(UUID.randomUUID().toString(),
+                targets, type,
+                body,
+                false,
+                attributes);
     }
 }

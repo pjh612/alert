@@ -7,24 +7,29 @@ import com.alert.core.messaging.sender.AlertMessageSender;
 public class DefaultAlertMessageHandler implements AlertMessageHandler {
     private final AlertCacheManager alertCacheManager;
     private final AlertMessageSender alertMessageSender;
+    private final AlertMessageSupport support;
     private final String topic;
-    private static final String ALERT_CACHE_KEY_FORMAT = "alert:%s:%s";
 
-    public DefaultAlertMessageHandler(AlertCacheManager alertCacheManager, AlertMessageSender alertMessageSender, String topic) {
+    public DefaultAlertMessageHandler(AlertCacheManager alertCacheManager,
+                                      AlertMessageSender alertMessageSender,
+                                      AlertMessageSupport support, String topic) {
         this.alertCacheManager = alertCacheManager;
         this.alertMessageSender = alertMessageSender;
+        this.support = support;
         this.topic = topic;
     }
 
     @Override
     public void handle(AlertMessage message) {
-        long currentTimeMillis = System.currentTimeMillis();
-        String id = Long.toString(currentTimeMillis);
-        alertMessageSender.send(id, message);
+        String msgId = support.generateMessageId();
+
+        alertMessageSender.send(msgId, message);
 
         if (message.type().isCacheable()) {
-            String key = ALERT_CACHE_KEY_FORMAT.formatted(topic, message.targetId());
-            alertCacheManager.save(key, id, message);
+            message.targets().forEach(target -> {
+                String key = support.resolveCacheKey(topic, target);
+                alertCacheManager.save(key, msgId, message);
+            });
         }
     }
 }

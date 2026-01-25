@@ -4,29 +4,30 @@ import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Sinks;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ReactiveInMemoryEmitterRepository implements ReactiveEmitterRepository {
-    private final Map<String, Sinks.Many<ServerSentEvent<Object>>> emitterMap = new ConcurrentHashMap<>();
+public class ReactiveInMemoryEmitterRepository implements AlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> {
+    private final Map<String, AlertSession<Sinks.Many<ServerSentEvent<Object>>>> sessionMap = new ConcurrentHashMap<>();
 
     @Override
-    public Sinks.Many<ServerSentEvent<Object>> put(String id) {
-        Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().multicast().onBackpressureBuffer();
-        this.emitterMap.put(id, sink);
-
-        return sink;
+    public void put(String id, Sinks.Many<ServerSentEvent<Object>> engine) {
+        sessionMap.put(id, new AlertSession<>(id, engine, null));
     }
 
     @Override
-    public Sinks.Many<ServerSentEvent<Object>> getById(String id) {
-        return this.emitterMap.get(id);
+    public Optional<AlertSession<Sinks.Many<ServerSentEvent<Object>>>> getById(String id) {
+        return Optional.ofNullable(sessionMap.get(id));
     }
 
     @Override
-    public void deleteById(String id) {
-        Sinks.Many<ServerSentEvent<Object>> sink = this.emitterMap.remove(id);
-        if (sink != null) {
-            sink.tryEmitComplete();
+    public AlertSession<Sinks.Many<ServerSentEvent<Object>>> deleteById(String id) {
+        AlertSession<Sinks.Many<ServerSentEvent<Object>>> session = sessionMap.remove(id);
+
+        if (session != null && session.engine() != null) {
+            session.engine().tryEmitComplete();
         }
+
+        return session;
     }
 }

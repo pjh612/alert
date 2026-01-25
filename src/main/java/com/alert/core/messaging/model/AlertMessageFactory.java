@@ -1,10 +1,13 @@
 package com.alert.core.messaging.model;
 
+import java.util.List;
+import java.util.Map;
+
 public interface AlertMessageFactory {
 
-    AlertMessage onConnect(String targetId);
+    AlertMessage onConnect(String subscriberId, Map<String, String> attributes);
 
-    AlertMessage onReplayMessage(String targetId, Object message);
+    AlertMessage onReplay(String subscriberId, AlertMessage original, Map<String, String> attributes);
 
-    AlertMessage onMessage(String targetId, Object message);
+    AlertMessage create(List<AlertTarget> targets, AlertMessageType type, Object body, Map<String, String> attributes);
 }
