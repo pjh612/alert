@@ -54,6 +54,7 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
 
         return Flux.concat(recoveryFlux, sink.asFlux())
                 .timeout(Duration.ofMillis(timeoutMillis))
+                .doFinally(it -> repository.deleteById(subscriberId))
                 .doOnTerminate(() -> repository.deleteById(subscriberId));
     }
 
