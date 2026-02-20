@@ -17,6 +17,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -52,6 +53,7 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
         }
 
         return Flux.concat(recoveryFlux, sink.asFlux())
+                .timeout(Duration.ofMillis(timeoutMillis))
                 .doOnTerminate(() -> repository.deleteById(subscriberId));
     }
 

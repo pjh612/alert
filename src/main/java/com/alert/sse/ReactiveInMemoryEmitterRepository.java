@@ -30,4 +30,12 @@ public class ReactiveInMemoryEmitterRepository implements AlertSessionRepository
 
         return session;
     }
+
+    @Override
+    public long size() {
+        return sessionMap.values()
+                .stream()
+                .filter(it -> it.engine().currentSubscriberCount() > 0)
+                .count();
+    }
 }

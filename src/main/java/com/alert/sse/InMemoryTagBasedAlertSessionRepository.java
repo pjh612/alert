@@ -106,4 +106,9 @@ public class InMemoryTagBasedAlertSessionRepository<T> implements TagBasedAlertS
         return sseSession;
     }
 
+    @Override
+    public long size() {
+        return sessionMap.size();
+    }
+
 }

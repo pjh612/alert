@@ -8,4 +8,6 @@ public interface AlertSessionRepository<T> {
     Optional<AlertSession<T>> getById(String id);
 
     AlertSession<T> deleteById(String id);
+
+    long size();
 }

@@ -28,4 +28,9 @@ public class InMemoryAlertSessionRepository<T> implements AlertSessionRepository
     public AlertSession<T> deleteById(String id) {
         return sessionMap.remove(id);
     }
+
+    @Override
+    public long size() {
+        return sessionMap.size();
+    }
 }
