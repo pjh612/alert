@@ -12,4 +12,6 @@ public interface ReactiveAlertManager {
     Mono<Void> noticeByTag(AlertChannel alertChannel, String tag, Object message);
 
     Mono<Void> notice(AlertChannel alertChannel, List<AlertTarget> targets, Object message);
+
+    Mono<Void> broadcast(AlertChannel alertChannel, Object message);
 }

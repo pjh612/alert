@@ -26,7 +26,7 @@ public class SlackAlertMessageSender implements AlertMessageSender {
     }
 
     @Override
-    public void send(String id, AlertMessage message) {
+    public void send(String namespace, String id, AlertMessage message) {
         if (!shouldSend(message)) return;
 
         String content = formatMessage(message);

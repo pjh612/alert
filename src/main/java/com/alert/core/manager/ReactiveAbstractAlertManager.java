@@ -34,8 +34,14 @@ public abstract class ReactiveAbstractAlertManager implements ReactiveAlertManag
     }
 
     @Override
+    public Mono<Void> broadcast(AlertChannel channel, Object message) {
+        return notice(channel, List.of(AlertTarget.broadcast()), message);
+    }
+
+    @Override
     public Mono<Void> notice(AlertChannel channel, List<AlertTarget> targets, Object message) {
         return Mono.fromSupplier(() -> alertMessageFactory.create(
+                        channel.namespace(),
                         targets,
                         DefaultAlertMessageType.MESSAGE,
                         message,

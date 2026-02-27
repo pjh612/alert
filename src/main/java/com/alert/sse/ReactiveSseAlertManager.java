@@ -41,27 +41,28 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
 
     @Override
     public Flux<ServerSentEvent<Object>> subscribe(AlertChannel channel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
+        String namespace = channel.namespace();
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().multicast().onBackpressureBuffer();
-        repository.put(subscriberId, new HashSet<>(tags), sink);
+        repository.put(namespace, subscriberId, new HashSet<>(tags), sink);
 
-        Mono.fromRunnable(() -> alertMessagePublisher.publish(channel.name(), alertMessageFactory.onConnect(subscriberId, null)))
+        Mono.fromRunnable(() -> alertMessagePublisher.publish(channel.name(), alertMessageFactory.onConnect(namespace, subscriberId, null)))
                 .subscribe();
 
         Flux<ServerSentEvent<Object>> recoveryFlux = Flux.empty();
         if (StringUtils.hasText(lastEventId)) {
-            recoveryFlux = getRecoveryFlux(channel.name(), subscriberId, tags, Long.parseLong(lastEventId));
+            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, Long.parseLong(lastEventId));
         }
 
         return Flux.concat(recoveryFlux, sink.asFlux())
                 .timeout(Duration.ofMillis(timeoutMillis))
-                .doFinally(it -> repository.deleteById(subscriberId))
-                .doOnTerminate(() -> repository.deleteById(subscriberId));
+                .doFinally(it -> repository.deleteById(namespace, subscriberId))
+                .doOnTerminate(() -> repository.deleteById(namespace, subscriberId));
     }
 
-    private Flux<ServerSentEvent<Object>> getRecoveryFlux(String topic, String id, List<String> tags, long offset) {
+    private Flux<ServerSentEvent<Object>> getRecoveryFlux(String namespace, String id, List<String> tags, long offset) {
         List<Flux<? extends AlertMessage>> sources = new ArrayList<>();
-        sources.add(cacheManager.getFromOffset(support.resolveCacheKey(topic, AlertTarget.id(id)), offset, messageType));
-        tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(topic, AlertTarget.tag(tag)), offset, messageType)));
+        sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.id(id)), offset, messageType));
+        tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.tag(tag)), offset, messageType)));
 
         return Flux.merge(sources)
                 .distinct(AlertMessage::id) // 중복 제거

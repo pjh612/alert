@@ -15,13 +15,13 @@ public abstract class AbstractAlertMessageSender<T> implements AlertMessageSende
     }
 
     @Override
-    public void send(String id, AlertMessage message) {
+    public void send(String namespace, String id, AlertMessage message) {
         Set<T> engines = new HashSet<>();
         for (AlertTarget target : message.targets()) {
-            if (target.type() == AlertTarget.TargetType.ID) {
-                repository.getById(target.value()).ifPresent(it -> engines.add(it.engine()));
-            } else if (target.type() == AlertTarget.TargetType.TAG) {
-                repository.getByTag(target.value()).forEach(s -> engines.add(s.engine()));
+            switch (target.type()) {
+                case ID -> repository.getById(namespace, target.value()).ifPresent(it -> engines.add(it.engine()));
+                case TAG -> repository.getByTag(namespace, target.value()).forEach(s -> engines.add(s.engine()));
+                case BROADCAST -> repository.getAll(namespace).forEach(s -> engines.add(s.engine()));
             }
         }
 

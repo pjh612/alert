@@ -7,9 +7,10 @@ import java.util.UUID;
 public class DefaultAlertMessageFactory implements AlertMessageFactory {
 
     @Override
-    public AlertMessage onConnect(String subscriberId, Map<String, String> attributes) {
+    public AlertMessage onConnect(String namespace, String subscriberId, Map<String, String> attributes) {
         return new DefaultAlertMessage(
                 UUID.randomUUID().toString(),
+                namespace,
                 List.of(AlertTarget.id(subscriberId)),
                 DefaultAlertMessageType.CONNECT,
                 "connected",
@@ -19,9 +20,10 @@ public class DefaultAlertMessageFactory implements AlertMessageFactory {
     }
 
     @Override
-    public AlertMessage onReplay(String subscriberId, AlertMessage original, Map<String, String> attributes) {
+    public AlertMessage onReplay(String namespace, String subscriberId, AlertMessage original, Map<String, String> attributes) {
         return new DefaultAlertMessage(
                 UUID.randomUUID().toString(),
+                namespace,
                 List.of(AlertTarget.id(subscriberId)),
                 original.type(),
                 original.body(),
@@ -31,11 +33,15 @@ public class DefaultAlertMessageFactory implements AlertMessageFactory {
     }
 
     @Override
-    public AlertMessage create(List<AlertTarget> targets, AlertMessageType type, Object body, Map<String, String> attributes) {
-        return new DefaultAlertMessage(UUID.randomUUID().toString(),
-                targets, type,
+    public AlertMessage create(String namespace, List<AlertTarget> targets, AlertMessageType type, Object body, Map<String, String> attributes) {
+        return new DefaultAlertMessage(
+                UUID.randomUUID().toString(),
+                namespace,
+                targets,
+                type,
                 body,
                 false,
-                attributes);
+                attributes
+        );
     }
 }

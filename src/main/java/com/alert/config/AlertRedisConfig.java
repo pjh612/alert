@@ -134,7 +134,7 @@ public class AlertRedisConfig {
         for (String topic : topics) {
             redisMessageListenerRegistrar.register(
                     topic,
-                    new DefaultAlertMessageHandler(alertCacheManager, alertMessageSender, alertMessageSupport, topic),
+                    new DefaultAlertMessageHandler(alertCacheManager, alertMessageSender, alertMessageSupport),
                     alertMessageConverter
             );
         }
@@ -153,7 +153,7 @@ public class AlertRedisConfig {
         ReactiveRedisMessageListenerRegistrar redisMessageListenerRegistrar = new ReactiveRedisMessageListenerRegistrar(redisMessageListenerContainer);
         List<String> topics = alertProperties.topics();
         for (String topic : topics) {
-            redisMessageListenerRegistrar.register(topic, new DefaultReactiveAlertMessageHandler(alertCacheManager, alertMessageSender, alertMessageSupport, topic), alertMessageConverter);
+            redisMessageListenerRegistrar.register(topic, new DefaultReactiveAlertMessageHandler(alertCacheManager, alertMessageSender, alertMessageSupport), alertMessageConverter);
         }
 
         return redisMessageListenerRegistrar;

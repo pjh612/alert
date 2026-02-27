@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alert"
-version = "1.2.3"
+version = "1.2.4"
 
 tasks.named<Jar>("jar") {
     archiveClassifier.set("") // plain 제거, 기본 jar 이름으로 설정

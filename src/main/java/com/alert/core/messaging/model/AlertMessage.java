@@ -7,6 +7,8 @@ import java.util.Map;
 public interface AlertMessage {
     String id();
 
+    String namespace();
+
     AlertMessageType type();
 
     List<AlertTarget> targets();

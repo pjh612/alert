@@ -31,8 +31,14 @@ public abstract class AbstractAlertManager implements AlertManager {
         notice(channel, List.of(AlertTarget.tag(tag)), message);
     }
 
+    @Override
+    public void broadcast(AlertChannel channel, Object message) {
+        notice(channel, List.of(AlertTarget.broadcast()), message);
+    }
+
     public void notice(AlertChannel channel, List<AlertTarget> targets, Object message) {
         AlertMessage alertMessage = alertMessageFactory.create(
+                channel.namespace(),
                 targets,
                 DefaultAlertMessageType.MESSAGE,
                 message,

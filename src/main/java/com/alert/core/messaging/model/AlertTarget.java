@@ -10,8 +10,13 @@ public record AlertTarget(TargetType type, String value) {
         return new AlertTarget(TargetType.TAG, tag);
     }
 
+    public static AlertTarget broadcast() {
+        return new AlertTarget(TargetType.BROADCAST, "*");
+    }
+
     public enum TargetType {
         ID,
-        TAG
+        TAG,
+        BROADCAST
     }
 }

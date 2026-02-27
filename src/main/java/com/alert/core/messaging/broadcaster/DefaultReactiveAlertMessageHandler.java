@@ -10,28 +10,27 @@ public class DefaultReactiveAlertMessageHandler implements ReactiveAlertMessageH
     private final ReactiveAlertCacheManager alertCacheManager;
     private final AlertMessageSender alertMessageSender;
     private final AlertMessageSupport support;
-    private final String topic;
 
     public DefaultReactiveAlertMessageHandler(ReactiveAlertCacheManager alertCacheManager,
                                               AlertMessageSender alertMessageSender,
-                                              AlertMessageSupport support, String topic) {
+                                              AlertMessageSupport support) {
         this.alertCacheManager = alertCacheManager;
         this.alertMessageSender = alertMessageSender;
         this.support = support;
-        this.topic = topic;
     }
 
     @Override
     public Mono<Void> handle(AlertMessage message) {
         String msgId = support.generateMessageId();
+        String namespace = message.namespace();
 
-        return Mono.fromRunnable(() -> alertMessageSender.send(msgId, message))
+        return Mono.fromRunnable(() -> alertMessageSender.send(namespace, msgId, message))
                 .then(Mono.defer(() -> {
                     if (!message.type().isCacheable()) return Mono.empty();
 
                     return Flux.fromIterable(message.targets())
                             .flatMap(target -> {
-                                String key = support.resolveCacheKey(topic, target);
+                                String key = support.resolveCacheKey(namespace, target);
                                 return alertCacheManager.save(key, msgId, message);
                             })
                             .then();

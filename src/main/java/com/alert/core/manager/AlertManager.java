@@ -11,4 +11,6 @@ public interface AlertManager {
     void noticeByTag(AlertChannel alertChannel, String tag, Object message);
 
     void notice(AlertChannel alertChannel, List<AlertTarget> targets, Object message);
+
+    void broadcast(AlertChannel alertChannel, Object message);
 }

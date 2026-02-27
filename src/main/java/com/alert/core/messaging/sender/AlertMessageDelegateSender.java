@@ -12,7 +12,7 @@ public class AlertMessageDelegateSender implements AlertMessageSender {
     }
 
     @Override
-    public void send(String id, AlertMessage message) {
-        alertMessageSenders.forEach(alertMessageSender -> alertMessageSender.send(id, message));
+    public void send(String namespace, String id, AlertMessage message) {
+        alertMessageSenders.forEach(alertMessageSender -> alertMessageSender.send(namespace, id, message));
     }
 }

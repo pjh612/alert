@@ -38,14 +38,15 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
 
     @Override
     public SseEmitter subscribe(AlertChannel alertChannel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
+        String namespace = alertChannel.namespace();
         SseEmitter emitter = new SseEmitter(timeoutMillis);
-        emitterRepository.put(subscriberId, new HashSet<>(tags), emitter);
+        emitterRepository.put(namespace, subscriberId, new HashSet<>(tags), emitter);
 
-        emitter.onTimeout(() -> cleanUpEmitter(subscriberId));
-        emitter.onCompletion(() -> cleanUpEmitter(subscriberId));
-        emitter.onError(e -> handleEmitterError(subscriberId, e));
+        emitter.onTimeout(() -> cleanUpEmitter(namespace, subscriberId));
+        emitter.onCompletion(() -> cleanUpEmitter(namespace, subscriberId));
+        emitter.onError(e -> handleEmitterError(namespace, subscriberId, e));
 
-        AlertMessage connectMsg = alertMessageFactory.onConnect(subscriberId, null);
+        AlertMessage connectMsg = alertMessageFactory.onConnect(namespace, subscriberId, null);
         alertMessagePublisher.publish(alertChannel.name(), connectMsg);
 
         if (isReconnected(lastEventId)) {
@@ -55,11 +56,11 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         return emitter;
     }
 
-    private void handleEmitterError(String subscriberId, Throwable e) {
+    private void handleEmitterError(String namespace, String subscriberId, Throwable e) {
         if (e != null) {
             log.error("Error on SSE emitter id = {}, message = {}", subscriberId, e.getMessage(), e);
         }
-        cleanUpEmitter(subscriberId);
+        cleanUpEmitter(namespace, subscriberId);
     }
 
     private boolean isReconnected(String lastEventId) {
@@ -70,21 +71,22 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         long offset = parseOffset(lastEventId);
         if (offset < 0) return;
 
+        String namespace = alertChannel.namespace();
         Map<String, AlertMessage> mergedMessages = new TreeMap<>();
 
-        fetchAndMerge(mergedMessages, alertChannel.name(), AlertTarget.id(subscriberId), offset);
+        fetchAndMerge(mergedMessages, namespace, AlertTarget.id(subscriberId), offset);
 
         for (String tag : tags) {
-            fetchAndMerge(mergedMessages, alertChannel.name(), AlertTarget.tag(tag), offset);
+            fetchAndMerge(mergedMessages, namespace, AlertTarget.tag(tag), offset);
         }
 
         mergedMessages.values().forEach(msg ->
-                alertMessagePublisher.publish(alertChannel.name(), alertMessageFactory.onReplay(subscriberId, msg, null))
+                alertMessagePublisher.publish(alertChannel.name(), alertMessageFactory.onReplay(namespace, subscriberId, msg, null))
         );
     }
 
-    private void fetchAndMerge(Map<String, AlertMessage> map, String topic, AlertTarget target, long offset) {
-        String key = support.resolveCacheKey(topic, target);
+    private void fetchAndMerge(Map<String, AlertMessage> map, String namespace, AlertTarget target, long offset) {
+        String key = support.resolveCacheKey(namespace, target);
         alertCacheManager.getFromOffset(key, offset, messageType)
                 .forEach(msg -> map.putIfAbsent(msg.id(), msg));
     }
@@ -102,8 +104,9 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         }
     }
 
-    private void cleanUpEmitter(String subscriberId) {
-        AlertSession<SseEmitter> alertSession = emitterRepository.deleteById(subscriberId);
+    private void cleanUpEmitter(String namespace, String subscriberId) {
+        AlertSession<SseEmitter> alertSession = emitterRepository.deleteById(namespace, subscriberId);
+        if (alertSession == null) return;
         SseEmitter emitter = alertSession.engine();
         if (emitter != null) {
             try {

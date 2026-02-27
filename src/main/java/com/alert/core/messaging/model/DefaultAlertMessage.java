@@ -5,7 +5,9 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
 import java.util.Map;
 
-public record DefaultAlertMessage(String id, List<AlertTarget> targets,
+public record DefaultAlertMessage(String id,
+                                  String namespace,
+                                  List<AlertTarget> targets,
                                   @JsonDeserialize(as = DefaultAlertMessageType.class)
                                   AlertMessageType type,
                                   Object body,
