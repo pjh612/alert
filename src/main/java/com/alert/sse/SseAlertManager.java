@@ -1,9 +1,11 @@
 package com.alert.sse;
 
-import com.alert.cache.AlertCacheManager;
+import com.alert.core.cache.AlertCacheManager;
+import com.alert.core.session.AlertSession;
+import com.alert.core.session.TagBasedAlertSessionRepository;
 import com.alert.core.manager.AbstractAlertManager;
 import com.alert.core.manager.SubscribableAlertManager;
-import com.alert.core.messaging.bridge.AlertMessagePublisher;
+import com.alert.core.messaging.publisher.AlertMessagePublisher;
 import com.alert.core.messaging.broadcaster.AlertMessageSupport;
 import com.alert.core.messaging.model.AlertChannel;
 import com.alert.core.messaging.model.AlertMessage;
@@ -34,7 +36,6 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         this.support = support;
         this.messageType = messageType;
     }
-
 
     @Override
     public SseEmitter subscribe(AlertChannel alertChannel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {

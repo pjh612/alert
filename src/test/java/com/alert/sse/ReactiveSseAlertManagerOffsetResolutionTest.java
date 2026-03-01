@@ -1,0 +1,95 @@
+package com.alert.sse;
+
+import com.alert.core.cache.ReactiveAlertCacheManager;
+import com.alert.core.messaging.broadcaster.AlertMessageSupport;
+import com.alert.core.messaging.model.*;
+import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
+import com.alert.core.session.TagBasedAlertSessionRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.http.codec.ServerSentEvent;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
+
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class ReactiveSseAlertManagerOffsetResolutionTest {
+
+    @Mock ReactiveAlertMessagePublisher alertMessagePublisher;
+    @Mock AlertMessageFactory alertMessageFactory;
+    @Mock TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository;
+    @Mock ReactiveAlertCacheManager cacheManager;
+    @Mock AlertMessageSupport support;
+
+    ReactiveSseAlertManager manager;
+
+    private static final String NAMESPACE = "test-ns";
+    private static final String SUBSCRIBER_ID = "user1";
+    private static final String CACHE_KEY = "alert:test-ns:user:user1";
+
+    private AlertChannel channel;
+
+    @BeforeEach
+    void setUp() {
+        manager = new ReactiveSseAlertManager(
+                alertMessagePublisher, alertMessageFactory,
+                repository, cacheManager, support, DefaultAlertMessage.class);
+
+        channel = () -> NAMESPACE;
+
+        when(support.resolveCacheKey(eq(NAMESPACE), any(AlertTarget.class))).thenReturn(CACHE_KEY);
+        doReturn(Flux.empty()).when(cacheManager).getFromOffset(any(), any(), any());
+    }
+
+    private void triggerSubscribe(String lastEventId) {
+        manager.subscribe(channel, SUBSCRIBER_ID, List.of(), lastEventId, 30000L)
+                .subscribe()
+                .dispose();
+    }
+
+    @Test
+    @DisplayName("lastEventId 없으면 getFromOffset 호출 안함")
+    void noLastEventId_doesNotCallGetFromOffset() {
+        triggerSubscribe(null);
+
+        verify(cacheManager, never()).getFromOffset(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("lastEventId=100이면 offset 100으로 getFromOffset 호출")
+    void withLastEventId100_getFromOffsetWith100() {
+        triggerSubscribe("100");
+
+        verify(cacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+    }
+
+    @Test
+    @DisplayName("태그 포함 시 ID + 각 태그 캐시 키로 getFromOffset 호출")
+    void withTags_getFromOffsetCalledForIdAndEachTag() {
+        String tagKey1 = "alert:test-ns:tag:vip";
+        String tagKey2 = "alert:test-ns:tag:admin";
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.id(SUBSCRIBER_ID))).thenReturn(CACHE_KEY);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("vip"))).thenReturn(tagKey1);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("admin"))).thenReturn(tagKey2);
+        doReturn(Flux.empty()).when(cacheManager).getFromOffset(any(), any(), any());
+
+        manager.subscribe(channel, SUBSCRIBER_ID, List.of("vip", "admin"), "100", 30000L)
+                .subscribe()
+                .dispose();
+
+        verify(cacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+        verify(cacheManager).getFromOffset(tagKey1, 100L, DefaultAlertMessage.class);
+        verify(cacheManager).getFromOffset(tagKey2, 100L, DefaultAlertMessage.class);
+    }
+}

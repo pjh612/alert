@@ -1,14 +1,15 @@
 package com.alert.sse;
 
-import com.alert.cache.ReactiveAlertCacheManager;
+import com.alert.core.cache.ReactiveAlertCacheManager;
 import com.alert.core.manager.ReactiveAbstractAlertManager;
 import com.alert.core.manager.ReactiveSubscribableAlertManager;
-import com.alert.core.messaging.bridge.ReactiveAlertMessagePublisher;
+import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
 import com.alert.core.messaging.broadcaster.AlertMessageSupport;
 import com.alert.core.messaging.model.AlertChannel;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.AlertMessageFactory;
 import com.alert.core.messaging.model.AlertTarget;
+import com.alert.core.session.TagBasedAlertSessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implements ReactiveSubscribableAlertManager<Flux<ServerSentEvent<Object>>> {
     private final TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository;
@@ -65,7 +67,7 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
         tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.tag(tag)), offset, messageType)));
 
         return Flux.merge(sources)
-                .distinct(AlertMessage::id) // 중복 제거
+                .distinct(AlertMessage::id)
                 .sort(Comparator.comparing(AlertMessage::id))
                 .map(msg -> ServerSentEvent.builder().id(msg.id()).event(msg.type().toString()).data(msg.body()).build());
     }

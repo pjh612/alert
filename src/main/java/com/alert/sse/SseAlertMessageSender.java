@@ -1,14 +1,11 @@
 package com.alert.sse;
 
 import com.alert.core.messaging.model.AlertMessage;
-import com.alert.core.messaging.model.AlertTarget;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.AbstractAlertMessageSender;
+import com.alert.core.session.TagBasedAlertSessionRepository;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 public class SseAlertMessageSender extends AbstractAlertMessageSender<SseEmitter> {
     public SseAlertMessageSender(TagBasedAlertSessionRepository<SseEmitter> repository) {

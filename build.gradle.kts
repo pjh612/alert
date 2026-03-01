@@ -5,10 +5,11 @@ plugins {
     id("org.springframework.boot") version "4.0.2"
     id("io.spring.dependency-management") version "1.1.4"
     id("maven-publish")
+    id ("jacoco")
 }
 
 group = "com.alert"
-version = "1.2.4"
+version = "1.2.5"
 
 tasks.named<Jar>("jar") {
     archiveClassifier.set("") // plain 제거, 기본 jar 이름으로 설정
@@ -40,6 +41,8 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation ("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-web")
+    testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind")
 }
 
 tasks.test {
@@ -52,4 +55,25 @@ publishing {
             from(components["java"])
         }
     }
+}
+
+tasks.jacocoTestReport {
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        csv.required.set(false)
+    }
+    val excluded = listOf(
+        "**/config/**"
+    )
+
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(excluded)
+                }
+            }
+        )
+    )
 }

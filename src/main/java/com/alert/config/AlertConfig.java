@@ -1,28 +1,30 @@
 package com.alert.config;
 
-import com.alert.cache.AlertCacheManager;
-import com.alert.cache.ReactiveAlertCacheManager;
+import com.alert.core.cache.AlertCacheManager;
+import com.alert.core.cache.ReactiveAlertCacheManager;
 import com.alert.core.manager.AlertManager;
 import com.alert.core.manager.ReactiveSubscribableAlertManager;
 import com.alert.core.manager.SubscribableAlertManager;
-import com.alert.core.messaging.bridge.AlertMessageBroadcastHandler;
-import com.alert.core.messaging.bridge.AlertMessagePublisher;
-import com.alert.core.messaging.bridge.ReactiveAlertMessageBroadcastHandler;
-import com.alert.core.messaging.bridge.ReactiveAlertMessagePublisher;
-import com.alert.core.messaging.bridge.ReactiveTopicAlertMessageHandler;
-import com.alert.core.messaging.bridge.TopicAlertMessageHandler;
 import com.alert.core.messaging.broadcaster.AlertMessageSupport;
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
 import com.alert.core.messaging.broadcaster.ReactiveMessageBroadcaster;
+import com.alert.core.messaging.consumer.AlertMessageBroadcastHandler;
+import com.alert.core.messaging.consumer.ReactiveAlertMessageBroadcastHandler;
+import com.alert.core.messaging.consumer.ReactiveTopicAlertMessageHandler;
+import com.alert.core.messaging.consumer.TopicAlertMessageHandler;
+import com.alert.core.messaging.id.IdGenerator;
+import com.alert.core.messaging.id.SnowflakeIdGenerator;
 import com.alert.core.messaging.model.AlertMessageFactory;
 import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessageFactory;
+import com.alert.core.messaging.publisher.AlertMessagePublisher;
+import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
 import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.session.TagBasedAlertSessionRepository;
 import com.alert.sse.ReactiveSseAlertManager;
 import com.alert.sse.ReactiveSseAlertMessageSender;
 import com.alert.sse.SseAlertManager;
 import com.alert.sse.SseAlertMessageSender;
-import com.alert.sse.TagBasedAlertSessionRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -39,6 +41,13 @@ import tools.jackson.databind.ObjectMapper;
 @Import({EmitterRepositoryConfig.class, AlertRedisConfig.class, AlertKafkaConfig.class})
 @Configuration
 public class AlertConfig {
+
+    private final AlertProperties properties;
+
+    public AlertConfig(AlertProperties properties) {
+        this.properties = properties;
+    }
+
     @Bean
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
     @ConditionalOnMissingBean(AlertManager.class)
@@ -66,8 +75,8 @@ public class AlertConfig {
 
     @Bean
     @ConditionalOnMissingBean(AlertMessageFactory.class)
-    public AlertMessageFactory alertMessageFactory() {
-        return new DefaultAlertMessageFactory();
+    public AlertMessageFactory alertMessageFactory(AlertMessageSupport alertMessageSupport) {
+        return new DefaultAlertMessageFactory(alertMessageSupport);
     }
 
 
@@ -95,13 +104,19 @@ public class AlertConfig {
     @Bean
     @ConditionalOnMissingBean(ReactiveTopicAlertMessageHandler.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
-    ReactiveTopicAlertMessageHandler<Long> reactiveTopicAlertMessageHandler(ReactiveMessageBroadcaster<String,Long> messageBroadcaster, ObjectMapper objectMapper) {
+    ReactiveTopicAlertMessageHandler<Long> reactiveTopicAlertMessageHandler(ReactiveMessageBroadcaster<String, Long> messageBroadcaster, ObjectMapper objectMapper) {
         return new ReactiveAlertMessageBroadcastHandler<>(messageBroadcaster, objectMapper);
     }
 
     @Bean
-    @ConditionalOnMissingBean(ReactiveSseAlertMessageSender.class)
-    public AlertMessageSupport alertMessageSupport() {
-        return new AlertMessageSupport();
+    @ConditionalOnMissingBean(AlertMessageSupport.class)
+    public AlertMessageSupport alertMessageSupport(IdGenerator<?> idGenerator) {
+        return new AlertMessageSupport(idGenerator);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(IdGenerator.class)
+    public IdGenerator<?> idGenerator() {
+        return new SnowflakeIdGenerator(properties.nodeId());
     }
 }

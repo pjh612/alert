@@ -11,18 +11,12 @@ import org.slf4j.LoggerFactory;
 public class SlackAlertMessageSender implements AlertMessageSender {
     private final SlackApi slackApi;
     private final MessageConverter<AlertMessage, String> messageConverter;
-    private final String channel;
 
     private static final Logger log = LoggerFactory.getLogger(SlackAlertMessageSender.class);
 
-    public SlackAlertMessageSender(String webhookUrl, String channel) {
-        this(webhookUrl, null, channel);
-    }
-
-    public SlackAlertMessageSender(String webhookUrl, MessageConverter<AlertMessage, String> messageConverter, String channel) {
+    public SlackAlertMessageSender(String webhookUrl, MessageConverter<AlertMessage, String> messageConverter) {
         this.slackApi = new SlackApi(webhookUrl);
         this.messageConverter = messageConverter;
-        this.channel = channel;
     }
 
     @Override
@@ -30,7 +24,7 @@ public class SlackAlertMessageSender implements AlertMessageSender {
         if (!shouldSend(message)) return;
 
         String content = formatMessage(message);
-        SlackMessage slackMessage = new SlackMessage(channel, content);
+        SlackMessage slackMessage = new SlackMessage(namespace, content);
 
         try {
             slackApi.call(slackMessage);

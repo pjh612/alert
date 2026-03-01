@@ -1,15 +1,21 @@
 package com.alert.core.messaging.model;
 
+import com.alert.core.messaging.broadcaster.AlertMessageSupport;
+
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public class DefaultAlertMessageFactory implements AlertMessageFactory {
+    private final AlertMessageSupport support;
+
+    public DefaultAlertMessageFactory(AlertMessageSupport support) {
+        this.support = support;
+    }
 
     @Override
     public AlertMessage onConnect(String namespace, String subscriberId, Map<String, String> attributes) {
         return new DefaultAlertMessage(
-                UUID.randomUUID().toString(),
+                support.generateMessageId(),
                 namespace,
                 List.of(AlertTarget.id(subscriberId)),
                 DefaultAlertMessageType.CONNECT,
@@ -22,7 +28,7 @@ public class DefaultAlertMessageFactory implements AlertMessageFactory {
     @Override
     public AlertMessage onReplay(String namespace, String subscriberId, AlertMessage original, Map<String, String> attributes) {
         return new DefaultAlertMessage(
-                UUID.randomUUID().toString(),
+                support.generateMessageId(),
                 namespace,
                 List.of(AlertTarget.id(subscriberId)),
                 original.type(),
@@ -35,7 +41,7 @@ public class DefaultAlertMessageFactory implements AlertMessageFactory {
     @Override
     public AlertMessage create(String namespace, List<AlertTarget> targets, AlertMessageType type, Object body, Map<String, String> attributes) {
         return new DefaultAlertMessage(
-                UUID.randomUUID().toString(),
+                support.generateMessageId(),
                 namespace,
                 targets,
                 type,

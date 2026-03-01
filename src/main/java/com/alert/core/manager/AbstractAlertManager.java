@@ -1,6 +1,6 @@
 package com.alert.core.manager;
 
-import com.alert.core.messaging.bridge.AlertMessagePublisher;
+import com.alert.core.messaging.publisher.AlertMessagePublisher;
 import com.alert.core.messaging.model.AlertChannel;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.AlertMessageFactory;

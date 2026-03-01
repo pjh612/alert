@@ -1,11 +1,9 @@
 package com.alert.config;
 
-import com.alert.sse.AlertSessionRepository;
-import com.alert.sse.InMemoryAlertSessionRepository;
-import com.alert.sse.InMemoryTagBasedAlertSessionRepository;
+import com.alert.core.session.AlertSessionRepository;
+import com.alert.core.session.InMemoryTagBasedAlertSessionRepository;
+import com.alert.core.session.TagBasedAlertSessionRepository;
 import com.alert.sse.ReactiveEmitterRepository;
-import com.alert.sse.ReactiveInMemoryEmitterRepository;
-import com.alert.sse.TagBasedAlertSessionRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;

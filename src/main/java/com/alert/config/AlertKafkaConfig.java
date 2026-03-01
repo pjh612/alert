@@ -1,18 +1,22 @@
 package com.alert.config;
 
-import com.alert.core.messaging.bridge.AlertMessageBroadcastHandler;
-import com.alert.core.messaging.bridge.AlertMessagePublisher;
-import com.alert.core.messaging.bridge.KafkaMessageConsumerRegistrar;
-import com.alert.core.messaging.bridge.KafkaMessagePublisher;
-import com.alert.core.messaging.bridge.MessageConsumerRegistrar;
-import com.alert.core.messaging.bridge.ReactiveAlertMessageBroadcastHandler;
-import com.alert.core.messaging.bridge.ReactiveAlertMessagePublisher;
-import com.alert.core.messaging.bridge.ReactiveKafkaAlertMessagePublisher;
-import com.alert.core.messaging.bridge.ReactiveKafkaMessageConsumerRegistrar;
-import com.alert.core.messaging.bridge.ReactiveMessageConsumerRegistrar;
+import com.alert.core.cache.AlertCacheManager;
+import com.alert.core.cache.ReactiveAlertCacheManager;
+import com.alert.core.messaging.broadcaster.AlertMessageSupport;
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
 import com.alert.core.messaging.broadcaster.ReactiveMessageBroadcaster;
+import com.alert.core.messaging.consumer.AlertMessageBroadcastHandler;
+import com.alert.core.messaging.consumer.MessageConsumerRegistrar;
+import com.alert.core.messaging.consumer.ReactiveAlertMessageBroadcastHandler;
+import com.alert.core.messaging.consumer.ReactiveMessageConsumerRegistrar;
 import com.alert.core.messaging.model.AlertMessage;
+import com.alert.core.messaging.publisher.AlertMessagePublisher;
+import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
+import com.alert.infra.kafka.KafkaMessageConsumerRegistrar;
+import com.alert.infra.kafka.KafkaMessagePublisher;
+import com.alert.infra.kafka.PartitionKeyStrategy;
+import com.alert.infra.kafka.ReactiveKafkaAlertMessagePublisher;
+import com.alert.infra.kafka.ReactiveKafkaMessageConsumerRegistrar;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -62,6 +66,10 @@ public class AlertKafkaConfig {
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
+        configProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        configProps.put(ProducerConfig.ACKS_CONFIG, "all");
+        configProps.put(ProducerConfig.RETRIES_CONFIG, 5);
+        configProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
         return new DefaultKafkaProducerFactory<>(configProps);
     }
@@ -79,22 +87,32 @@ public class AlertKafkaConfig {
         producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
+        producerProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
+        producerProps.put(ProducerConfig.RETRIES_CONFIG, 5);
+        producerProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
         SenderOptions<String, AlertMessage> senderOptions = SenderOptions.create(producerProps);
         return KafkaSender.create(senderOptions);
     }
 
     @Bean
+    @ConditionalOnMissingBean(PartitionKeyStrategy.class)
+    public PartitionKeyStrategy partitionKeyStrategy() {
+        return PartitionKeyStrategy.none();
+    }
+
+    @Bean
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
     @ConditionalOnMissingBean(AlertMessagePublisher.class)
-    public AlertMessagePublisher alertMessagePublisher(KafkaTemplate<String, AlertMessage> alertKafkaTemplate) {
-        return new KafkaMessagePublisher(alertKafkaTemplate);
+    public AlertMessagePublisher alertMessagePublisher(KafkaTemplate<String, AlertMessage> alertKafkaTemplate, AlertMessageSupport alertMessageSupport, PartitionKeyStrategy partitionKeyStrategy, AlertCacheManager alertCacheManager) {
+        return new KafkaMessagePublisher(alertCacheManager, alertMessageSupport, alertKafkaTemplate, partitionKeyStrategy);
     }
 
     @Bean
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
-    ReactiveAlertMessagePublisher reactiveAlertMessagePublisher(KafkaSender<String, AlertMessage> kafkaSender) {
-        return new ReactiveKafkaAlertMessagePublisher(kafkaSender);
+    ReactiveAlertMessagePublisher reactiveAlertMessagePublisher(KafkaSender<String, AlertMessage> kafkaSender, AlertMessageSupport alertMessageSupport, PartitionKeyStrategy partitionKeyStrategy, ReactiveAlertCacheManager reactiveAlertCacheManager) {
+        return new ReactiveKafkaAlertMessagePublisher(reactiveAlertCacheManager, alertMessageSupport, kafkaSender, partitionKeyStrategy);
     }
 
     @Bean("alertConsumerFactory")
@@ -106,6 +124,7 @@ public class AlertKafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
@@ -142,6 +161,7 @@ public class AlertKafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
         ReactiveKafkaMessageConsumerRegistrar<T> kafkaMessageConsumerRegistrar = new ReactiveKafkaMessageConsumerRegistrar<>(props);
 
         List<String> topics = alertProperties.topics();
