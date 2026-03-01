@@ -16,9 +16,11 @@ import org.mockito.quality.Strictness;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
+import reactor.test.StepVerifier;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -72,6 +74,28 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         triggerSubscribe("100");
 
         verify(cacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+    }
+
+    @Test
+    @DisplayName("재전송 메시지는 Kafka를 거치지 않고 Flux로 직접 방출된다")
+    void missedMessages_emittedDirectlyInFlux_notViaKafka() {
+        AlertMessage missed = new DefaultAlertMessage(
+                "103", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                DefaultAlertMessageType.MESSAGE, "missed body", false, null);
+        doReturn(Flux.just(missed)).when(cacheManager)
+                .getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+
+        StepVerifier.create(
+                        manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L))
+                .assertNext(event -> {
+                    assertThat(event.id()).isEqualTo("103");
+                    assertThat(event.data()).isEqualTo("missed body");
+                })
+                .thenCancel()
+                .verify();
+
+        // recovery Flux가 직접 방출하므로 alertMessagePublisher는 replay 메시지를 발행하지 않는다
+        verify(alertMessagePublisher, never()).publish(eq(NAMESPACE), argThat(msg -> msg != null && msg.isReplay()));
     }
 
     @Test

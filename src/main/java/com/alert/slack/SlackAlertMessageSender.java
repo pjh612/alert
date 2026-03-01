@@ -2,13 +2,13 @@ package com.alert.slack;
 
 import com.alert.core.messaging.broadcaster.MessageConverter;
 import com.alert.core.messaging.model.AlertMessage;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.BasicAlertMessageSender;
 import net.gpedro.integrations.slack.SlackApi;
 import net.gpedro.integrations.slack.SlackMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SlackAlertMessageSender implements AlertMessageSender {
+public class SlackAlertMessageSender implements BasicAlertMessageSender {
     private final SlackApi slackApi;
     private final MessageConverter<AlertMessage, String> messageConverter;
 

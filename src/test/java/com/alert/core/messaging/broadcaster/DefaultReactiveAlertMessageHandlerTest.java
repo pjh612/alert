@@ -2,7 +2,7 @@ package com.alert.core.messaging.broadcaster;
 
 import com.alert.core.cache.ReactiveAlertCacheManager;
 import com.alert.core.messaging.model.*;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.FanoutAlertMessageSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 class DefaultReactiveAlertMessageHandlerTest {
 
     @Mock ReactiveAlertCacheManager alertCacheManager;
-    @Mock AlertMessageSender alertMessageSender;
+    @Mock FanoutAlertMessageSender alertMessageSender;
     @Mock AlertMessageSupport support;
 
     DefaultReactiveAlertMessageHandler handler;

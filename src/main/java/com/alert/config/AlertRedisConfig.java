@@ -13,7 +13,7 @@ import com.alert.core.messaging.broadcaster.ReactiveMessageBroadcaster;
 import com.alert.core.messaging.broadcaster.StringJsonMessageConverter;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessage;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.FanoutAlertMessageSender;
 import com.alert.infra.redis.ReactiveRedisAlertCacheManager;
 import com.alert.infra.redis.ReactiveRedisMessageBroadcaster;
 import com.alert.infra.redis.ReactiveRedisMessageListenerRegistrar;
@@ -122,7 +122,7 @@ public class AlertRedisConfig {
     public AlertMessageListenerRegistrar<byte[]> messageListenerRegistrar(
             RedisMessageListenerContainer redisMessageListenerContainer,
             AlertProperties alertProperties,
-            AlertMessageSender alertMessageSender,
+            FanoutAlertMessageSender fanoutAlertMessageSender,
             MessageConverter<byte[], ? extends AlertMessage> alertMessageConverter) {
 
         RedisMessageListenerRegistrar redisMessageListenerRegistrar = new RedisMessageListenerRegistrar(redisMessageListenerContainer);
@@ -131,7 +131,7 @@ public class AlertRedisConfig {
         for (String topic : topics) {
             redisMessageListenerRegistrar.register(
                     topic,
-                    new DefaultAlertMessageHandler(alertMessageSender),
+                    new DefaultAlertMessageHandler(fanoutAlertMessageSender),
                     alertMessageConverter
             );
         }
@@ -142,13 +142,13 @@ public class AlertRedisConfig {
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
     @ConditionalOnMissingBean(ReactiveAlertMessageListenerRegistrar.class)
     public ReactiveAlertMessageListenerRegistrar<String> reactiveMessageListenerRegistrar(ReactiveRedisMessageListenerContainer redisMessageListenerContainer,
-                                                                                          AlertMessageSender alertMessageSender,
+                                                                                          FanoutAlertMessageSender fanoutAlertMessageSender,
                                                                                           MessageConverter<String, ? extends AlertMessage> alertMessageConverter,
                                                                                           AlertProperties alertProperties) {
         ReactiveRedisMessageListenerRegistrar redisMessageListenerRegistrar = new ReactiveRedisMessageListenerRegistrar(redisMessageListenerContainer);
         List<String> topics = alertProperties.topics();
         for (String topic : topics) {
-            redisMessageListenerRegistrar.register(topic, new DefaultReactiveAlertMessageHandler(alertMessageSender), alertMessageConverter);
+            redisMessageListenerRegistrar.register(topic, new DefaultReactiveAlertMessageHandler(fanoutAlertMessageSender), alertMessageConverter);
         }
 
         return redisMessageListenerRegistrar;

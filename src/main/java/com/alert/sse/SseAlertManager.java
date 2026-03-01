@@ -51,7 +51,7 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         alertMessagePublisher.publish(alertChannel.name(), connectMsg);
 
         if (isReconnected(lastEventId)) {
-            republishMissedMessages(alertChannel, subscriberId, tags, lastEventId);
+            replayMissedMessages(emitter, alertChannel.namespace(), subscriberId, tags, lastEventId);
         }
 
         return emitter;
@@ -68,22 +68,27 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         return StringUtils.hasText(lastEventId);
     }
 
-    private void republishMissedMessages(AlertChannel alertChannel, String subscriberId, List<String> tags, String lastEventId) {
+    private void replayMissedMessages(SseEmitter emitter, String namespace, String subscriberId, List<String> tags, String lastEventId) {
         long offset = parseOffset(lastEventId);
         if (offset < 0) return;
 
-        String namespace = alertChannel.namespace();
         Map<String, AlertMessage> mergedMessages = new TreeMap<>();
 
         fetchAndMerge(mergedMessages, namespace, AlertTarget.id(subscriberId), offset);
-
         for (String tag : tags) {
             fetchAndMerge(mergedMessages, namespace, AlertTarget.tag(tag), offset);
         }
 
-        mergedMessages.values().forEach(msg ->
-                alertMessagePublisher.publish(alertChannel.name(), alertMessageFactory.onReplay(namespace, subscriberId, msg, null))
-        );
+        mergedMessages.values().forEach(msg -> {
+            try {
+                emitter.send(SseEmitter.event()
+                        .id(msg.id())
+                        .name(msg.type().toString())
+                        .data(msg.body()));
+            } catch (Exception e) {
+                log.warn("Failed to replay message id={} to subscriber={}", msg.id(), subscriberId, e);
+            }
+        });
     }
 
     private void fetchAndMerge(Map<String, AlertMessage> map, String namespace, AlertTarget target, long offset) {

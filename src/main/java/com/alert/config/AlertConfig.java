@@ -19,12 +19,17 @@ import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessageFactory;
 import com.alert.core.messaging.publisher.AlertMessagePublisher;
 import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.BasicAlertMessageDelegateSender;
+import com.alert.core.messaging.sender.BasicAlertMessageSender;
+import com.alert.core.messaging.sender.FanoutAlertMessageSender;
 import com.alert.core.session.TagBasedAlertSessionRepository;
 import com.alert.sse.ReactiveSseAlertManager;
 import com.alert.sse.ReactiveSseAlertMessageSender;
 import com.alert.sse.SseAlertManager;
 import com.alert.sse.SseAlertMessageSender;
+import org.springframework.beans.factory.ObjectProvider;
+
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -82,30 +87,39 @@ public class AlertConfig {
 
     @Bean
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
-    @ConditionalOnMissingBean(AlertMessageSender.class)
-    public AlertMessageSender sseAlertMessageSender(TagBasedAlertSessionRepository<SseEmitter> emitterRepository) {
+    @ConditionalOnMissingBean(FanoutAlertMessageSender.class)
+    public FanoutAlertMessageSender sseAlertMessageSender(TagBasedAlertSessionRepository<SseEmitter> emitterRepository) {
         return new SseAlertMessageSender(emitterRepository);
     }
 
     @Bean
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
-    @ConditionalOnMissingBean(AlertMessageSender.class)
-    public AlertMessageSender reactiveSseAlertMessageSender(TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> emitterRepository) {
+    @ConditionalOnMissingBean(FanoutAlertMessageSender.class)
+    public FanoutAlertMessageSender reactiveSseAlertMessageSender(TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> emitterRepository) {
         return new ReactiveSseAlertMessageSender(emitterRepository);
     }
 
     @Bean
     @ConditionalOnMissingBean(TopicAlertMessageHandler.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
-    TopicAlertMessageHandler topicAlertMessageHandler(MessageBroadcaster<String> messageBroadcaster, ObjectMapper objectMapper) {
-        return new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper);
+    TopicAlertMessageHandler topicAlertMessageHandler(MessageBroadcaster<String> messageBroadcaster, ObjectMapper objectMapper,
+                                                      ObjectProvider<BasicAlertMessageSender> basicSenderProvider) {
+        return new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper, resolveBasicSender(basicSenderProvider));
     }
 
     @Bean
     @ConditionalOnMissingBean(ReactiveTopicAlertMessageHandler.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
-    ReactiveTopicAlertMessageHandler<Long> reactiveTopicAlertMessageHandler(ReactiveMessageBroadcaster<String, Long> messageBroadcaster, ObjectMapper objectMapper) {
-        return new ReactiveAlertMessageBroadcastHandler<>(messageBroadcaster, objectMapper);
+    ReactiveTopicAlertMessageHandler<Long> reactiveTopicAlertMessageHandler(ReactiveMessageBroadcaster<String, Long> messageBroadcaster, ObjectMapper objectMapper,
+                                                                            ObjectProvider<BasicAlertMessageSender> basicSenderProvider) {
+        return new ReactiveAlertMessageBroadcastHandler<>(messageBroadcaster, objectMapper, resolveBasicSender(basicSenderProvider));
+    }
+
+    private BasicAlertMessageSender resolveBasicSender(ObjectProvider<BasicAlertMessageSender> provider) {
+        List<BasicAlertMessageSender> senders = provider.stream().toList();
+        if (senders.isEmpty()) return null;
+        if (senders.size() == 1) return senders.get(0);
+        return new BasicAlertMessageDelegateSender(senders);
     }
 
     @Bean

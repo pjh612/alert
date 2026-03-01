@@ -2,15 +2,17 @@ package com.alert.core.messaging.consumer;
 
 import com.alert.core.messaging.broadcaster.MessageBroadcaster;
 import com.alert.core.messaging.model.AlertMessage;
-import com.alert.core.messaging.model.AlertMessageType;
 import com.alert.core.messaging.model.AlertTarget;
 import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessageType;
+import com.alert.core.messaging.sender.BasicAlertMessageDelegateSender;
+import com.alert.core.messaging.sender.BasicAlertMessageSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -37,7 +39,7 @@ class AlertMessageBroadcastHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper);
+        handler = new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper, null);
     }
 
     private AlertMessage createMessage() {
@@ -80,5 +82,59 @@ class AlertMessageBroadcastHandlerTest {
         handler.handle(TOPIC, msg);
 
         verify(messageBroadcaster, never()).sendMessage(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("BasicSender가 등록되면 Redis 브로드캐스트 전에 호출된다")
+    void withBasicSender_calledBeforeRedisBroadcast() throws Exception {
+        BasicAlertMessageSender basicSender = mock(BasicAlertMessageSender.class);
+        handler = new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper, basicSender);
+        AlertMessage msg = createMessage();
+        when(objectMapper.writeValueAsString(msg)).thenReturn("{}");
+
+        handler.handle(TOPIC, msg);
+
+        InOrder inOrder = inOrder(basicSender, messageBroadcaster);
+        inOrder.verify(basicSender).send(NAMESPACE, MSG_ID, msg);
+        inOrder.verify(messageBroadcaster).sendMessage(eq(TOPIC), anyString());
+    }
+
+    @Test
+    @DisplayName("DelegateSender로 여러 BasicSender가 등록되면 모두 호출된다")
+    void withDelegateSender_allBasicSendersAreCalled() throws Exception {
+        BasicAlertMessageSender basicSender1 = mock(BasicAlertMessageSender.class);
+        BasicAlertMessageSender basicSender2 = mock(BasicAlertMessageSender.class);
+        BasicAlertMessageDelegateSender delegateSender = new BasicAlertMessageDelegateSender(List.of(basicSender1, basicSender2));
+        handler = new AlertMessageBroadcastHandler(messageBroadcaster, objectMapper, delegateSender);
+        AlertMessage msg = createMessage();
+        when(objectMapper.writeValueAsString(msg)).thenReturn("{}");
+
+        handler.handle(TOPIC, msg);
+
+        verify(basicSender1).send(NAMESPACE, MSG_ID, msg);
+        verify(basicSender2).send(NAMESPACE, MSG_ID, msg);
+        verify(messageBroadcaster).sendMessage(eq(TOPIC), anyString());
+    }
+
+    @Test
+    @DisplayName("BasicSender가 없으면 브로드캐스트만 호출된다")
+    void withNoBasicSenders_onlyBroadcastIsCalled() throws Exception {
+        AlertMessage msg = createMessage();
+        when(objectMapper.writeValueAsString(msg)).thenReturn("{}");
+
+        handler.handle(TOPIC, msg);
+
+        verify(messageBroadcaster).sendMessage(eq(TOPIC), anyString());
+    }
+
+    @Test
+    @DisplayName("실패해도 예외가 전파되지 않는다")
+    void broadcastFails_doesNotThrow() throws Exception {
+        AlertMessage msg = createMessage();
+        when(objectMapper.writeValueAsString(msg)).thenThrow(new RuntimeException("error"));
+
+        handler.handle(TOPIC, msg);
+
+        // 예외가 전파되지 않으면 테스트 통과
     }
 }

@@ -7,7 +7,7 @@ import com.alert.core.session.TagBasedAlertSessionRepository;
 import java.util.HashSet;
 import java.util.Set;
 
-public abstract class AbstractAlertMessageSender<T> implements AlertMessageSender {
+public abstract class AbstractAlertMessageSender<T> implements FanoutAlertMessageSender {
     private final TagBasedAlertSessionRepository<T> repository;
 
     protected AbstractAlertMessageSender(TagBasedAlertSessionRepository<T> repository) {

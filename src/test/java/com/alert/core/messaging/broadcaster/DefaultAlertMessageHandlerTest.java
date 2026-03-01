@@ -5,7 +5,7 @@ import com.alert.core.messaging.model.AlertMessageType;
 import com.alert.core.messaging.model.AlertTarget;
 import com.alert.core.messaging.model.DefaultAlertMessage;
 import com.alert.core.messaging.model.DefaultAlertMessageType;
-import com.alert.core.messaging.sender.AlertMessageSender;
+import com.alert.core.messaging.sender.FanoutAlertMessageSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 class DefaultAlertMessageHandlerTest {
 
     @Mock
-    AlertMessageSender alertMessageSender;
+    FanoutAlertMessageSender alertMessageSender;
 
     DefaultAlertMessageHandler handler;
 

@@ -96,22 +96,23 @@ class SseAlertManagerSubscribeTest {
     }
 
     @Test
-    @DisplayName("subscribe: 중복 메시지는 TreeMap으로 머지")
+    @DisplayName("subscribe: 중복 메시지는 머지되어 emitter로 한 번만 전송되고 Kafka는 타지 않는다")
     void subscribe_duplicateMessages_mergedById() {
-        String duplicateId = support.generateMessageId();
+        String duplicateId = "100";
         AlertMessage msg1 = new DefaultAlertMessage(
                 duplicateId, NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
                 DefaultAlertMessageType.MESSAGE, "body1", false, null);
         AlertMessage msg2 = new DefaultAlertMessage(
-                duplicateId, NAMESPACE, List.of(AlertTarget.tag("vip")),
+                duplicateId, NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
                 DefaultAlertMessageType.MESSAGE, "body2", false, null);
-        AlertMessage replayMsg = mock(AlertMessage.class);
-
+        AlertMessage connectMsg = mock(AlertMessage.class);
+        when(alertMessageFactory.onConnect(any(), any(), any())).thenReturn(connectMsg);
         doReturn(List.of(msg1, msg2)).when(alertCacheManager).getFromOffset(eq(CACHE_KEY), eq(50L), any());
-        when(alertMessageFactory.onReplay(eq(NAMESPACE), eq(SUBSCRIBER_ID), any(), any())).thenReturn(replayMsg);
 
         manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "50", 30000L);
 
-        verify(alertMessagePublisher, atMost(2)).publish(eq(NAMESPACE), any());
+        // 중복된 ID의 메시지는 하나로 머지, Kafka publish는 connect 1회만
+        verify(alertMessagePublisher, times(1)).publish(any(), eq(connectMsg));
+        verify(alertMessageFactory, never()).onReplay(any(), any(), any(), any());
     }
 }

@@ -86,21 +86,20 @@ class SseAlertManagerOffsetResolutionTest {
     }
 
     @Test
-    @DisplayName("미전송 메시지가 있으면 onReplay로 재발행")
-    void missedMessages_areRepublishedAsReplay() {
-        String messageId = support.generateMessageId();
+    @DisplayName("재전송 메시지는 Kafka를 거치지 않고 emitter로 직접 전송된다")
+    void missedMessages_sentDirectlyToEmitter_notViaKafka() {
         AlertMessage missed = new DefaultAlertMessage(
-                messageId, NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                "103", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
                 DefaultAlertMessageType.MESSAGE, "missed body", false, null);
-        AlertMessage replayMsg = mock(AlertMessage.class);
-
+        AlertMessage connectMsg = mock(AlertMessage.class);
+        when(alertMessageFactory.onConnect(any(), any(), any())).thenReturn(connectMsg);
         doReturn(List.of(missed)).when(alertCacheManager)
                 .getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
-        when(alertMessageFactory.onReplay(eq(NAMESPACE), eq(SUBSCRIBER_ID), eq(missed), any()))
-                .thenReturn(replayMsg);
 
         manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L);
 
-        verify(alertMessagePublisher).publish(NAMESPACE, replayMsg);
+        // connect 메시지만 Kafka로 발행, replay 메시지는 emitter로 직접 전송
+        verify(alertMessagePublisher, times(1)).publish(any(), eq(connectMsg));
+        verify(alertMessageFactory, never()).onReplay(any(), any(), any(), any());
     }
 }
