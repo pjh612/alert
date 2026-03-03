@@ -44,6 +44,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-web")
     testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
     testImplementation("com.fasterxml.jackson.core:jackson-databind")
+    testImplementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
+    testImplementation("org.testcontainers:junit-jupiter:1.20.4")
 }
 
 tasks.test {
