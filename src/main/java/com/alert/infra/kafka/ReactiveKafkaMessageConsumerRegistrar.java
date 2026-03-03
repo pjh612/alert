@@ -79,6 +79,22 @@ public class ReactiveKafkaMessageConsumerRegistrar<R> implements ReactiveMessage
     }
 
     Mono<Void> processMessage(ReceiverRecord<String, AlertMessage> record, ReactiveTopicAlertMessageHandler<R> messageHandler, String dlqTopic) {
+        if (record.value() == null) {
+            log.error("Deserialization failed for record on topic={} partition={} offset={}, routing to DLQ",
+                    record.topic(), record.partition(), record.offset());
+            return publishToDlq(dlqTopic, record, new RuntimeException("Deserialization failed"))
+                    .onErrorResume(dlqError -> {
+                        log.error("Failed to send deserialization-failed record to DLQ {}: {}", dlqTopic, dlqError.getMessage());
+                        return Mono.empty();
+                    })
+                    .then(record.receiverOffset().commit()
+                            .retryWhen(Retry.backoff(dlqProperties.backoff().maxAttempts(), Duration.ofMillis(dlqProperties.backoff().interval())))
+                    )
+                    .onErrorResume(e -> {
+                        log.error("Failed to commit offset for deserialization-failed record on topic {}: {}", record.topic(), e.getMessage());
+                        return Mono.empty();
+                    });
+        }
         log.debug("Received message from topic {}: {}", record.topic(), record.value());
         return messageHandler.handle(record.topic(), record.value())
                 .retryWhen(Retry.fixedDelay(dlqProperties.backoff().maxAttempts(), Duration.ofMillis(dlqProperties.backoff().interval())))

@@ -54,6 +54,14 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         when(support.resolveCacheKey(eq(NAMESPACE), any(AlertTarget.class))).thenReturn(CACHE_KEY);
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.broadcast())).thenReturn(BROADCAST_KEY);
         doReturn(Flux.empty()).when(cacheManager).getFromOffset(any(), any(), any());
+
+        // connect 이벤트는 publisher를 거치지 않고 Flux에 직접 방출되므로 factory만 stub
+        AlertMessage connectMsg = mock(AlertMessage.class);
+        when(connectMsg.id()).thenReturn("connect-0");
+        when(connectMsg.type()).thenReturn(DefaultAlertMessageType.CONNECT);
+        when(connectMsg.body()).thenReturn("connected");
+        when(alertMessageFactory.onConnect(eq(NAMESPACE), eq(SUBSCRIBER_ID), any()))
+                .thenReturn(connectMsg);
     }
 
     private void triggerSubscribe(String lastEventId) {
@@ -90,6 +98,7 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
 
         StepVerifier.create(
                         manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L))
+                .assertNext(event -> assertThat(event.event()).isEqualTo(DefaultAlertMessageType.CONNECT.toString()))  // connect 이벤트가 항상 첫 번째
                 .assertNext(event -> {
                     assertThat(event.id()).isEqualTo("103");
                     assertThat(event.data()).isEqualTo("missed body");
@@ -97,8 +106,8 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
                 .thenCancel()
                 .verify();
 
-        // recovery Flux가 직접 방출하므로 alertMessagePublisher는 replay 메시지를 발행하지 않는다
-        verify(alertMessagePublisher, never()).publish(eq(NAMESPACE), argThat(msg -> msg != null && msg.isReplay()));
+        // recovery와 connect 모두 publisher를 거치지 않고 Flux에서 직접 방출된다
+        verifyNoInteractions(alertMessagePublisher);
     }
 
     @Test

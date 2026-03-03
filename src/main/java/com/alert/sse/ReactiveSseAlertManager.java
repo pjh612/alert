@@ -3,19 +3,18 @@ package com.alert.sse;
 import com.alert.core.cache.ReactiveAlertCacheManager;
 import com.alert.core.manager.ReactiveAbstractAlertManager;
 import com.alert.core.manager.ReactiveSubscribableAlertManager;
-import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
 import com.alert.core.messaging.broadcaster.AlertMessageSupport;
 import com.alert.core.messaging.model.AlertChannel;
 import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.AlertMessageFactory;
 import com.alert.core.messaging.model.AlertTarget;
+import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
 import com.alert.core.session.TagBasedAlertSessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.time.Duration;
@@ -44,23 +43,54 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
     @Override
     public Flux<ServerSentEvent<Object>> subscribe(AlertChannel channel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
         String namespace = channel.namespace();
+
+        repository.getById(namespace, subscriberId)
+                .ifPresent(old -> old.engine().tryEmitComplete());
+
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().multicast().onBackpressureBuffer();
         repository.put(namespace, subscriberId, new HashSet<>(tags), sink);
 
-        Mono.fromRunnable(() -> alertMessagePublisher.publish(channel.name(), alertMessageFactory.onConnect(namespace, subscriberId, null)))
-                .subscribe();
+        AlertMessage connectMsg = alertMessageFactory.onConnect(namespace, subscriberId, null);
+        Flux<ServerSentEvent<Object>> connectFlux = Flux.just(
+                ServerSentEvent.builder()
+                        .id(connectMsg.id())
+                        .event(connectMsg.type().toString())
+                        .data(connectMsg.body())
+                        .build()
+        );
+
+        long offset = StringUtils.hasText(lastEventId) ? parseOffset(lastEventId) : -1;
+        AtomicLong maxRecoveryId = new AtomicLong(offset);
 
         Flux<ServerSentEvent<Object>> recoveryFlux = Flux.empty();
-        if (StringUtils.hasText(lastEventId)) {
-            long offset = parseOffset(lastEventId);
-            if (offset >= 0) {
-                recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, offset);
-            }
+        if (offset >= 0) {
+            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, offset)
+                    .doOnNext(e -> {
+                        String eid = e.id();
+                        if (eid != null) {
+                            try {
+                                maxRecoveryId.updateAndGet(cur -> Math.max(cur, Long.parseLong(eid)));
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    });
         }
 
-        return Flux.concat(recoveryFlux, sink.asFlux())
-                .timeout(Duration.ofMillis(timeoutMillis))
+        Flux<ServerSentEvent<Object>> liveFlux = offset >= 0
+                ? sink.asFlux().filter(e -> isAfterRecovery(e.id(), maxRecoveryId))
+                : sink.asFlux();
+
+        return Flux.concat(connectFlux, recoveryFlux, liveFlux)
+                .timeout(Duration.ofMillis(timeoutMillis), Flux.empty())
                 .doFinally(it -> repository.deleteById(namespace, subscriberId));
+    }
+
+    private boolean isAfterRecovery(String eventId, AtomicLong maxRecoveryId) {
+        if (eventId == null) return true;
+        try {
+            return Long.parseLong(eventId) > maxRecoveryId.get();
+        } catch (NumberFormatException e) {
+            return true;
+        }
     }
 
     private long parseOffset(String lastEventId) {
@@ -80,7 +110,7 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
 
         return Flux.merge(sources)
                 .distinct(AlertMessage::id)
-                .sort(Comparator.comparing(AlertMessage::id))
+                .sort(Comparator.comparing(m -> Long.parseLong(m.id())))
                 .map(msg -> ServerSentEvent.builder().id(msg.id()).event(msg.type().toString()).data(msg.body()).build());
     }
 }

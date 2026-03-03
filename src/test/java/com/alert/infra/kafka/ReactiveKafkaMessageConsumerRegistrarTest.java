@@ -202,6 +202,33 @@ class ReactiveKafkaMessageConsumerRegistrarTest {
         }
 
         @Test
+        @DisplayName("역직렬화 실패(value=null) → handler 호출 없이 DLQ 즉시 라우팅 후 commit")
+        void nullValue_routesToDlq_withoutCallingHandler() {
+            when(record.value()).thenReturn(null);
+            stubDlqSuccess();
+
+            StepVerifier.create(registrar.processMessage(record, handler, DLQ_TOPIC))
+                    .verifyComplete();
+
+            verifyNoInteractions(handler);
+            verify(kafkaSender).send(any());
+            verify(receiverOffset).commit();
+        }
+
+        @Test
+        @DisplayName("역직렬화 실패 + DLQ 전송 실패 → commit 여전히 호출")
+        void nullValue_dlqFails_commitStillCalled() {
+            when(record.value()).thenReturn(null);
+            when(kafkaSender.send(any())).thenReturn(Flux.error(new RuntimeException("DLQ 전송 실패")));
+
+            StepVerifier.create(registrar.processMessage(record, handler, DLQ_TOPIC))
+                    .verifyComplete();
+
+            verifyNoInteractions(handler);
+            verify(receiverOffset).commit();
+        }
+
+        @Test
         @DisplayName("handle 실패 시 DLQ 헤더에 원인 메시지 포함")
         @SuppressWarnings("unchecked")
         void handle_fails_dlqHeader_containsCauseMessage() {
