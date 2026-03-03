@@ -37,8 +37,13 @@ public class KafkaMessagePublisher implements AlertMessagePublisher {
         }
 
         String partitionKey = partitionKeyStrategy.resolve(message);
-        kafkaTemplate.send(channel, partitionKey, message);
-
-        log.debug("channel:{}, partitionKey:{}, alertMessage:{}", channel, partitionKey, message);
+        kafkaTemplate.send(channel, partitionKey, message)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Kafka send failed. channel:{}, messageId:{}, reason:{}", channel, message.id(), ex.getMessage(), ex);
+                    } else {
+                        log.debug("channel:{}, partitionKey:{}, alertMessage:{}", channel, partitionKey, message);
+                    }
+                });
     }
 }

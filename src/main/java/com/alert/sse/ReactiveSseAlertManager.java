@@ -52,19 +52,31 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
 
         Flux<ServerSentEvent<Object>> recoveryFlux = Flux.empty();
         if (StringUtils.hasText(lastEventId)) {
-            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, Long.parseLong(lastEventId));
+            long offset = parseOffset(lastEventId);
+            if (offset >= 0) {
+                recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, offset);
+            }
         }
 
         return Flux.concat(recoveryFlux, sink.asFlux())
                 .timeout(Duration.ofMillis(timeoutMillis))
-                .doFinally(it -> repository.deleteById(namespace, subscriberId))
-                .doOnTerminate(() -> repository.deleteById(namespace, subscriberId));
+                .doFinally(it -> repository.deleteById(namespace, subscriberId));
+    }
+
+    private long parseOffset(String lastEventId) {
+        try {
+            return Long.parseLong(lastEventId);
+        } catch (NumberFormatException e) {
+            log.warn("Invalid lastEventId format: '{}'. Skipping replay.", lastEventId);
+            return -1;
+        }
     }
 
     private Flux<ServerSentEvent<Object>> getRecoveryFlux(String namespace, String id, List<String> tags, long offset) {
         List<Flux<? extends AlertMessage>> sources = new ArrayList<>();
         sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.id(id)), offset, messageType));
         tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.tag(tag)), offset, messageType)));
+        sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.broadcast()), offset, messageType));
 
         return Flux.merge(sources)
                 .distinct(AlertMessage::id)

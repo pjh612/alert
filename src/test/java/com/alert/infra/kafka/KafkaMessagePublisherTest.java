@@ -18,10 +18,13 @@ import org.mockito.quality.Strictness;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -43,6 +46,7 @@ class KafkaMessagePublisherTest {
     @BeforeEach
     void setUp() {
         publisher = new KafkaMessagePublisher(alertCacheManager, support, kafkaTemplate, PartitionKeyStrategy.none());
+        when(kafkaTemplate.send(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
     private AlertMessage createMessage() {

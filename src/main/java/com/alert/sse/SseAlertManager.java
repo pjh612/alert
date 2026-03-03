@@ -78,6 +78,7 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         for (String tag : tags) {
             fetchAndMerge(mergedMessages, namespace, AlertTarget.tag(tag), offset);
         }
+        fetchAndMerge(mergedMessages, namespace, AlertTarget.broadcast(), offset);
 
         mergedMessages.values().forEach(msg -> {
             try {

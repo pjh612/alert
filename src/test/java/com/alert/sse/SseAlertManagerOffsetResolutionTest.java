@@ -36,6 +36,7 @@ class SseAlertManagerOffsetResolutionTest {
     private static final String NAMESPACE = "test-ns";
     private static final String SUBSCRIBER_ID = "user1";
     private static final String CACHE_KEY = "alert:test-ns:user:user1";
+    private static final String BROADCAST_KEY = "alert:test-ns:broadcast:*";
 
     private AlertChannel channel;
 
@@ -48,6 +49,7 @@ class SseAlertManagerOffsetResolutionTest {
         channel = () -> NAMESPACE;
 
         when(support.resolveCacheKey(eq(NAMESPACE), any(AlertTarget.class))).thenReturn(CACHE_KEY);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.broadcast())).thenReturn(BROADCAST_KEY);
         when(support.generateMessageId()).thenReturn("100");
         doReturn(Collections.emptyList()).when(alertCacheManager).getFromOffset(any(), any(), any());
     }
@@ -66,6 +68,7 @@ class SseAlertManagerOffsetResolutionTest {
         manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L);
 
         verify(alertCacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+        verify(alertCacheManager).getFromOffset(BROADCAST_KEY, 100L, DefaultAlertMessage.class);
     }
 
     @Test
@@ -76,6 +79,7 @@ class SseAlertManagerOffsetResolutionTest {
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.id(SUBSCRIBER_ID))).thenReturn(CACHE_KEY);
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("vip"))).thenReturn(tagKey1);
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("admin"))).thenReturn(tagKey2);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.broadcast())).thenReturn(BROADCAST_KEY);
         doReturn(Collections.emptyList()).when(alertCacheManager).getFromOffset(any(), any(), any());
 
         manager.subscribe(channel, SUBSCRIBER_ID, List.of("vip", "admin"), "100", 30000L);
@@ -83,6 +87,7 @@ class SseAlertManagerOffsetResolutionTest {
         verify(alertCacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
         verify(alertCacheManager).getFromOffset(tagKey1, 100L, DefaultAlertMessage.class);
         verify(alertCacheManager).getFromOffset(tagKey2, 100L, DefaultAlertMessage.class);
+        verify(alertCacheManager).getFromOffset(BROADCAST_KEY, 100L, DefaultAlertMessage.class);
     }
 
     @Test

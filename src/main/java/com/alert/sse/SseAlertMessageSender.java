@@ -5,7 +5,6 @@ import com.alert.core.messaging.sender.AbstractAlertMessageSender;
 import com.alert.core.session.TagBasedAlertSessionRepository;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 
 public class SseAlertMessageSender extends AbstractAlertMessageSender<SseEmitter> {
     public SseAlertMessageSender(TagBasedAlertSessionRepository<SseEmitter> repository) {
@@ -20,7 +19,7 @@ public class SseAlertMessageSender extends AbstractAlertMessageSender<SseEmitter
                 .id(id);
         try {
             emitter.send(eventBuilder.build());
-        } catch (IOException e) {
+        } catch (Exception e) {
             emitter.completeWithError(e);
         }
     }

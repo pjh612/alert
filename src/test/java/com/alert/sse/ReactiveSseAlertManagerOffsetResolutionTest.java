@@ -39,6 +39,7 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
     private static final String NAMESPACE = "test-ns";
     private static final String SUBSCRIBER_ID = "user1";
     private static final String CACHE_KEY = "alert:test-ns:user:user1";
+    private static final String BROADCAST_KEY = "alert:test-ns:broadcast:*";
 
     private AlertChannel channel;
 
@@ -51,6 +52,7 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         channel = () -> NAMESPACE;
 
         when(support.resolveCacheKey(eq(NAMESPACE), any(AlertTarget.class))).thenReturn(CACHE_KEY);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.broadcast())).thenReturn(BROADCAST_KEY);
         doReturn(Flux.empty()).when(cacheManager).getFromOffset(any(), any(), any());
     }
 
@@ -74,6 +76,7 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         triggerSubscribe("100");
 
         verify(cacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
+        verify(cacheManager).getFromOffset(BROADCAST_KEY, 100L, DefaultAlertMessage.class);
     }
 
     @Test
@@ -106,6 +109,7 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.id(SUBSCRIBER_ID))).thenReturn(CACHE_KEY);
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("vip"))).thenReturn(tagKey1);
         when(support.resolveCacheKey(NAMESPACE, AlertTarget.tag("admin"))).thenReturn(tagKey2);
+        when(support.resolveCacheKey(NAMESPACE, AlertTarget.broadcast())).thenReturn(BROADCAST_KEY);
         doReturn(Flux.empty()).when(cacheManager).getFromOffset(any(), any(), any());
 
         manager.subscribe(channel, SUBSCRIBER_ID, List.of("vip", "admin"), "100", 30000L)
@@ -115,5 +119,6 @@ class ReactiveSseAlertManagerOffsetResolutionTest {
         verify(cacheManager).getFromOffset(CACHE_KEY, 100L, DefaultAlertMessage.class);
         verify(cacheManager).getFromOffset(tagKey1, 100L, DefaultAlertMessage.class);
         verify(cacheManager).getFromOffset(tagKey2, 100L, DefaultAlertMessage.class);
+        verify(cacheManager).getFromOffset(BROADCAST_KEY, 100L, DefaultAlertMessage.class);
     }
 }

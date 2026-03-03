@@ -31,6 +31,7 @@ dependencies {
     compileOnly("org.springframework.boot:spring-boot-starter-webflux")
     compileOnly("org.springframework.boot:spring-boot-starter-data-redis")
     compileOnly("org.springframework.boot:spring-boot-starter-data-redis-reactive")
+    compileOnly("io.micrometer:micrometer-core")
     implementation("org.springframework.kafka:spring-kafka")
     implementation ("io.projectreactor.kafka:reactor-kafka:1.3.25")
     implementation("net.gpedro.integrations.slack:slack-webhook:1.4.0")

@@ -18,7 +18,11 @@ public class AlertMessageSupport {
     }
 
     public String resolveCacheKey(String namespace, AlertTarget target) {
-        String typePrefix = (target.type() == AlertTarget.TargetType.TAG) ? "tag" : "user";
+        String typePrefix = switch (target.type()) {
+            case TAG -> "tag";
+            case BROADCAST -> "broadcast";
+            case ID -> "user";
+        };
         return ALERT_CACHE_KEY_FORMAT.formatted(namespace, typePrefix, target.value());
     }
 

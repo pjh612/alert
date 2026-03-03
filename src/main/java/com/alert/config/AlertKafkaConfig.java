@@ -185,7 +185,8 @@ public class AlertKafkaConfig {
     @ConditionalOnMissingBean(MessageConsumerRegistrar.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
     public <T> ReactiveMessageConsumerRegistrar<T> reactiveMessageConsumerRegistrar(ReactiveMessageBroadcaster<String, T> messageBroadcaster, ObjectMapper objectMapper, @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
-                                                                                    ObjectProvider<BasicAlertMessageSender> basicSenderProvider) {
+                                                                                    ObjectProvider<BasicAlertMessageSender> basicSenderProvider,
+                                                                                    KafkaSender<String, AlertMessage> kafkaSender) {
         BasicAlertMessageSender basicSender = resolveBasicSender(basicSenderProvider);
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -194,7 +195,7 @@ public class AlertKafkaConfig {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
-        ReactiveKafkaMessageConsumerRegistrar<T> kafkaMessageConsumerRegistrar = new ReactiveKafkaMessageConsumerRegistrar<>(props);
+        ReactiveKafkaMessageConsumerRegistrar<T> kafkaMessageConsumerRegistrar = new ReactiveKafkaMessageConsumerRegistrar<>(props, alertKafkaProperties.dlq(), kafkaSender);
 
         List<String> topics = alertProperties.topics();
         for (String topic : topics) {
