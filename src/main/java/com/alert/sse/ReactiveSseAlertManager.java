@@ -9,6 +9,7 @@ import com.alert.core.messaging.model.AlertMessage;
 import com.alert.core.messaging.model.AlertMessageFactory;
 import com.alert.core.messaging.model.AlertTarget;
 import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
+import com.alert.core.session.AlertSession;
 import com.alert.core.session.TagBasedAlertSessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,30 +23,32 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implements ReactiveSubscribableAlertManager<Flux<ServerSentEvent<Object>>> {
     private final TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository;
     private final ReactiveAlertCacheManager cacheManager;
     private final AlertMessageSupport support;
     private final Class<? extends AlertMessage> messageType;
-
+    private final Comparator<String> idComparator;
     private static final Logger log = LoggerFactory.getLogger(ReactiveSseAlertManager.class);
 
-    public ReactiveSseAlertManager(ReactiveAlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository, ReactiveAlertCacheManager cacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType) {
+    public ReactiveSseAlertManager(ReactiveAlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository, ReactiveAlertCacheManager cacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, Comparator<String> idComparator) {
         super(alertMessageFactory, alertMessagePublisher);
         this.repository = repository;
         this.cacheManager = cacheManager;
         this.support = support;
         this.messageType = messageType;
+        this.idComparator = idComparator;
     }
 
     @Override
     public Flux<ServerSentEvent<Object>> subscribe(AlertChannel channel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
         String namespace = channel.namespace();
-
-        repository.getById(namespace, subscriberId)
-                .ifPresent(old -> old.engine().tryEmitComplete());
+        AlertSession<Sinks.Many<ServerSentEvent<Object>>> deletedSession = repository.deleteById(namespace, subscriberId);
+        if(deletedSession != null) {
+            deletedSession.engine().tryEmitComplete();
+        }
 
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().multicast().onBackpressureBuffer();
         repository.put(namespace, subscriberId, new HashSet<>(tags), sink);
@@ -59,23 +62,24 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
                         .build()
         );
 
-        long offset = StringUtils.hasText(lastEventId) ? parseOffset(lastEventId) : -1;
-        AtomicLong maxRecoveryId = new AtomicLong(offset);
+        boolean hasOffset = StringUtils.hasText(lastEventId);
+
+        AtomicReference<String> maxRecoveryId = new AtomicReference<>(lastEventId);
 
         Flux<ServerSentEvent<Object>> recoveryFlux = Flux.empty();
-        if (offset >= 0) {
-            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, offset)
+        if (hasOffset) {
+            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, lastEventId)
                     .doOnNext(e -> {
                         String eid = e.id();
                         if (eid != null) {
-                            try {
-                                maxRecoveryId.updateAndGet(cur -> Math.max(cur, Long.parseLong(eid)));
-                            } catch (NumberFormatException ignored) {}
+                            maxRecoveryId.accumulateAndGet(eid, (current, next) ->
+                                    (current == null || idComparator.compare(current, next) < 0) ? next : current
+                            );
                         }
                     });
         }
 
-        Flux<ServerSentEvent<Object>> liveFlux = offset >= 0
+        Flux<ServerSentEvent<Object>> liveFlux = hasOffset
                 ? sink.asFlux().filter(e -> isAfterRecovery(e.id(), maxRecoveryId))
                 : sink.asFlux();
 
@@ -84,33 +88,24 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
                 .doFinally(it -> repository.deleteById(namespace, subscriberId));
     }
 
-    private boolean isAfterRecovery(String eventId, AtomicLong maxRecoveryId) {
-        if (eventId == null) return true;
-        try {
-            return Long.parseLong(eventId) > maxRecoveryId.get();
-        } catch (NumberFormatException e) {
-            return true;
-        }
+    private boolean isAfterRecovery(String eventId, AtomicReference<String> maxRecoveryIdRef) {
+        if (eventId == null) return false;
+        String maxId = maxRecoveryIdRef.get();
+        if (maxId == null) return false;
+
+        return idComparator.compare(eventId, maxId) > 0;
     }
 
-    private long parseOffset(String lastEventId) {
-        try {
-            return Long.parseLong(lastEventId);
-        } catch (NumberFormatException e) {
-            log.warn("Invalid lastEventId format: '{}'. Skipping replay.", lastEventId);
-            return -1;
-        }
-    }
-
-    private Flux<ServerSentEvent<Object>> getRecoveryFlux(String namespace, String id, List<String> tags, long offset) {
+    private Flux<ServerSentEvent<Object>> getRecoveryFlux(String namespace, String id, List<String> tags, String offset) {
         List<Flux<? extends AlertMessage>> sources = new ArrayList<>();
         sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.id(id)), offset, messageType));
         tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.tag(tag)), offset, messageType)));
         sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.broadcast()), offset, messageType));
 
         return Flux.merge(sources)
+                .filter(m -> m.id() != null)
                 .distinct(AlertMessage::id)
-                .sort(Comparator.comparing(m -> Long.parseLong(m.id())))
+                .sort((m1, m2) -> idComparator.compare(m1.id(), m2.id()))
                 .map(msg -> ServerSentEvent.builder().id(msg.id()).event(msg.type().toString()).data(msg.body()).build());
     }
 }

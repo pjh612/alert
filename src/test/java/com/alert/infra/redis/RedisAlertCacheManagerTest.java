@@ -80,7 +80,7 @@ class RedisAlertCacheManagerTest {
         when(zSetOps.rangeByScoreWithScores(eq(CACHE_KEY), anyDouble(), eq(Double.MAX_VALUE)))
                 .thenReturn(typedTuples);
 
-        List<? extends AlertMessage> result = cacheManager.getFromOffset(CACHE_KEY, 1700000000001L, DefaultAlertMessage.class);
+        List<? extends AlertMessage> result = cacheManager.getFromOffset(CACHE_KEY, "1700000000001", DefaultAlertMessage.class);
 
         assertThat(result).hasSize(1);
     }

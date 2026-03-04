@@ -57,10 +57,17 @@ public class ReactiveRedisMessageListenerRegistrar
         Mono<Void> completion = container.receive(ChannelTopic.of(topic))
                 .takeUntilOther(stopSink.asMono())
                 .flatMap(it -> {
-                    AlertMessage alertMessage = messageConverter.convert(it.getMessage());
-                    return handler.handle(alertMessage);
+                    try {
+                        AlertMessage alertMessage = messageConverter.convert(it.getMessage());
+                        return handler.handle(alertMessage)
+                                .doOnError(e -> log.error("Handler error: {}", e.getMessage()))
+                                .onErrorResume(e -> Mono.empty());
+                    } catch (Exception e) {
+                        log.error("Conversion error: {}", e.getMessage());
+                        return Mono.empty();
+                    }
                 })
-                .doOnError(e -> log.error("Error in reactive redis listener for topic {}: {}", topic, e.getMessage()))
+                .doOnError(e -> log.error("Critical stream error: {}", e.getMessage()))
                 .then()
                 .onErrorComplete()
                 .cache();
@@ -85,7 +92,6 @@ public class ReactiveRedisMessageListenerRegistrar
 
         topicStopSinks.values().forEach(Sinks.Empty::tryEmitEmpty);
 
-        // 2) 모든 flatMap 내 in-flight 메시지가 처리될 때까지 대기
         try {
             Mono.when(topicCompletionMonos.values())
                     .block(Duration.ofSeconds(30));

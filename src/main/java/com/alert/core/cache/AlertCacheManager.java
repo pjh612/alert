@@ -7,5 +7,5 @@ import java.util.List;
 public interface AlertCacheManager {
     Boolean save(String key, String id, AlertMessage value);
 
-    List<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass);
+    List<? extends AlertMessage> getFromOffset(String key, String offset, Class<? extends AlertMessage> tClass);
 }

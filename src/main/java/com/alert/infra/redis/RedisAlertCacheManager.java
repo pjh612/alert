@@ -37,9 +37,15 @@ public class RedisAlertCacheManager implements AlertCacheManager {
     }
 
     @Override
-    public List<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass) {
+    public List<? extends AlertMessage> getFromOffset(String key, String offset, Class<? extends AlertMessage> tClass) {
+        long score;
+        try {
+            score = Long.parseLong(offset);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid offset format for Redis ZSet: '" + offset + "'");
+        }
         Set<ZSetOperations.TypedTuple<String>> typedTuples =
-                messageCache.opsForZSet().rangeByScoreWithScores(key, offset + 1, Double.MAX_VALUE);
+                messageCache.opsForZSet().rangeByScoreWithScores(key, score + 1, Double.MAX_VALUE);
 
         return typedTuples.stream()
                 .map(it -> objectMapper.readValue(it.getValue(), tClass))

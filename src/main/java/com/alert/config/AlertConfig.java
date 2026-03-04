@@ -2,6 +2,8 @@ package com.alert.config;
 
 import com.alert.core.cache.AlertCacheManager;
 import com.alert.core.cache.ReactiveAlertCacheManager;
+import com.alert.core.comparator.DefaultIdComparator;
+import com.alert.core.comparator.IdComparator;
 import com.alert.core.manager.AlertManager;
 import com.alert.core.manager.ReactiveSubscribableAlertManager;
 import com.alert.core.manager.SubscribableAlertManager;
@@ -28,8 +30,6 @@ import com.alert.sse.ReactiveSseAlertMessageSender;
 import com.alert.sse.SseAlertManager;
 import com.alert.sse.SseAlertMessageSender;
 import org.springframework.beans.factory.ObjectProvider;
-
-import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -41,6 +41,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 @EnableConfigurationProperties(AlertProperties.class)
 @Import({EmitterRepositoryConfig.class, AlertRedisConfig.class, AlertKafkaConfig.class})
@@ -54,19 +56,19 @@ public class AlertConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
     @ConditionalOnMissingBean(AlertManager.class)
+    @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
     public SubscribableAlertManager<SseEmitter> defaultAlertManager(
             TagBasedAlertSessionRepository<SseEmitter> emitterRepository,
             AlertCacheManager alertCacheManager,
             AlertMessageFactory alertMessageConverter,
             AlertMessagePublisher alertMessagePublisher,
-            AlertMessageSupport alertMessageSupport
-    ) {
+            AlertMessageSupport alertMessageSupport) {
         return new SseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, alertMessageSupport, DefaultAlertMessage.class);
     }
 
     @Bean
+    @ConditionalOnMissingBean(ReactiveSubscribableAlertManager.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
     public ReactiveSubscribableAlertManager<Flux<ServerSentEvent<Object>>> reactiveDefaultAlertManager(
             TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> emitterRepository,
@@ -75,7 +77,13 @@ public class AlertConfig {
             ReactiveAlertMessagePublisher alertMessagePublisher,
             AlertMessageSupport alertMessageSupport
     ) {
-        return new ReactiveSseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, alertMessageSupport, DefaultAlertMessage.class);
+        return new ReactiveSseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, alertMessageSupport, DefaultAlertMessage.class, new DefaultIdComparator());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(IdComparator.class)
+    IdComparator idComparator() {
+        return new DefaultIdComparator();
     }
 
     @Bean

@@ -29,8 +29,14 @@ public class ReactiveRedisAlertCacheManager implements ReactiveAlertCacheManager
     }
 
     @Override
-    public Flux<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass) {
-        Range<Double> range = Range.from(Range.Bound.inclusive(offset + 1.0))
+    public Flux<? extends AlertMessage> getFromOffset(String key, String offset, Class<? extends AlertMessage> tClass) {
+        long score;
+        try {
+            score = Long.parseLong(offset);
+        } catch (NumberFormatException e) {
+            return Flux.error(new IllegalArgumentException("Invalid offset format for Redis ZSet: '" + offset + "'"));
+        }
+        Range<Double> range = Range.from(Range.Bound.inclusive(score + 1.0))
                 .to(Range.Bound.unbounded());
         return redisTemplate.opsForZSet()
                 .rangeByScoreWithScores(key, range)

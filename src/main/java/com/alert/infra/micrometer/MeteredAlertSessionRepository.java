@@ -33,13 +33,13 @@ public class MeteredAlertSessionRepository<T> implements TagBasedAlertSessionRep
     }
 
     @Override
-    public void put(String namespace, String id, T engine) {
-        delegate.put(namespace, id, engine);
+    public AlertSession<T> put(String namespace, String id, T engine) {
+        return delegate.put(namespace, id, engine);
     }
 
     @Override
-    public void put(String namespace, String id, Set<String> tags, T engine) {
-        delegate.put(namespace, id, tags, engine);
+    public AlertSession<T> put(String namespace, String id, Set<String> tags, T engine) {
+        return delegate.put(namespace, id, tags, engine);
     }
 
     @Override

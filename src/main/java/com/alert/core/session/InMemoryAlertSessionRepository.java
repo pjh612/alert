@@ -17,9 +17,10 @@ public class InMemoryAlertSessionRepository<T> implements AlertSessionRepository
     }
 
     @Override
-    public void put(String namespace, String id, T engine) {
+    public AlertSession<T> put(String namespace, String id, T engine) {
         sessionMap.computeIfAbsent(namespace, k -> new ConcurrentHashMap<>())
                 .put(id, new AlertSession<>(id, engine, null));
+        return null;
     }
 
     @Override

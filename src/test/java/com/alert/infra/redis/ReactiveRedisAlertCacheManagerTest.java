@@ -84,7 +84,7 @@ class ReactiveRedisAlertCacheManagerTest {
         typedTuples.add(new DefaultTypedTuple<>(json, Double.parseDouble(MSG_ID)));
         when(zSetOps.rangeByScoreWithScores(eq(CACHE_KEY), any(Range.class))).thenReturn(Flux.fromIterable(typedTuples));
 
-        StepVerifier.create(cacheManager.getFromOffset(CACHE_KEY, 1700000000000L, DefaultAlertMessage.class))
+        StepVerifier.create(cacheManager.getFromOffset(CACHE_KEY, "1700000000000", DefaultAlertMessage.class))
                 .expectNextMatches(m -> m.id().equals(MSG_ID))
                 .verifyComplete();
     }

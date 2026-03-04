@@ -16,9 +16,10 @@ public class ReactiveInMemoryEmitterRepository implements AlertSessionRepository
     private final Map<String, Map<String, AlertSession<Sinks.Many<ServerSentEvent<Object>>>>> sessionMap = new ConcurrentHashMap<>();
 
     @Override
-    public void put(String namespace, String id, Sinks.Many<ServerSentEvent<Object>> engine) {
+    public AlertSession<Sinks.Many<ServerSentEvent<Object>>> put(String namespace, String id, Sinks.Many<ServerSentEvent<Object>> engine) {
         sessionMap.computeIfAbsent(namespace, k -> new ConcurrentHashMap<>())
                 .put(id, new AlertSession<>(id, engine, null));
+        return null;
     }
 
     @Override

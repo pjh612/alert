@@ -1,7 +1,6 @@
 package com.alert.core.session;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -20,16 +19,17 @@ public class InMemoryTagBasedAlertSessionRepository<T> implements TagBasedAlertS
     }
 
     @Override
-    public void put(String namespace, String id, T engine) {
+    public AlertSession<T> put(String namespace, String id, T engine) {
         Map<String, AlertSession<T>> ns = sessionMap.computeIfAbsent(namespace, k -> new ConcurrentHashMap<>());
         if (ns.containsKey(id)) {
             deleteById(namespace, id);
         }
-        ns.put(id, new AlertSession<>(id, engine, new CopyOnWriteArraySet<>()));
+
+        return ns.put(id, new AlertSession<>(id, engine, new CopyOnWriteArraySet<>()));
     }
 
     @Override
-    public void put(String namespace, String id, Set<String> tags, T engine) {
+    public AlertSession<T> put(String namespace, String id, Set<String> tags, T engine) {
         Map<String, AlertSession<T>> ns = sessionMap.computeIfAbsent(namespace, k -> new ConcurrentHashMap<>());
         if (ns.containsKey(id)) {
             deleteById(namespace, id);
@@ -38,12 +38,14 @@ public class InMemoryTagBasedAlertSessionRepository<T> implements TagBasedAlertS
         Set<String> safeTags = (tags == null) ? new CopyOnWriteArraySet<>() : new CopyOnWriteArraySet<>(tags);
         AlertSession<T> session = new AlertSession<>(id, engine, safeTags);
 
+
+
         Map<String, Set<String>> nsTagIndex = tagIndex.computeIfAbsent(namespace, k -> new ConcurrentHashMap<>());
         for (String tag : safeTags) {
             nsTagIndex.computeIfAbsent(tag, k -> new CopyOnWriteArraySet<>()).add(id);
         }
 
-        ns.put(id, session);
+        return ns.put(id, session);
     }
 
     @Override
@@ -82,9 +84,11 @@ public class InMemoryTagBasedAlertSessionRepository<T> implements TagBasedAlertS
         Map<String, Set<String>> nsTagIndex = tagIndex.get(namespace);
         if (nsTagIndex == null) return;
 
-        Set<String> ids = nsTagIndex.get(tag);
-        if (ids != null) {
-            new HashSet<>(ids).forEach(id -> deleteById(namespace, id));
+        Set<String> ids = nsTagIndex.remove(tag);
+        if (ids == null) return;
+
+        for (String id : ids) {
+            deleteById(namespace, id);
         }
     }
 
@@ -104,13 +108,13 @@ public class InMemoryTagBasedAlertSessionRepository<T> implements TagBasedAlertS
 
     @Override
     public AlertSession<T> deleteById(String namespace, String id) {
-        Map<String, AlertSession<T>> ns = sessionMap.get(namespace);
-        if (ns == null) return null;
+        Map<String, AlertSession<T>> sessions = sessionMap.get(namespace);
+        if (sessions == null) return null;
 
-        AlertSession<T> session = ns.remove(id);
+        AlertSession<T> session = sessions.remove(id);
         if (session == null) return null;
 
-        Map<String, Set<String>> nsTagIndex = tagIndex.get(namespace);
+        Map<String, Set<String>> nsTagIndex = this.tagIndex.get(namespace);
         if (nsTagIndex != null) {
             session.tags().forEach(tag -> nsTagIndex.computeIfPresent(tag, (k, ids) -> {
                 ids.remove(id);

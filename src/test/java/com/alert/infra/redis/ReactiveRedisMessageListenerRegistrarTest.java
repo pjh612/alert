@@ -51,8 +51,6 @@ class ReactiveRedisMessageListenerRegistrarTest {
         when(container.receive(any(ChannelTopic.class))).thenReturn(Flux.never());
     }
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("start 전 isRunning = false")
     void beforeStart_isRunning_false() {
@@ -117,8 +115,6 @@ class ReactiveRedisMessageListenerRegistrarTest {
         verify(container, times(2)).receive(any(ChannelTopic.class));
     }
 
-    // ── Graceful drain ─────────────────────────────────────────────────────
-
     @Test
     @DisplayName("stop 호출 시 처리 중인 메시지가 완료된 후 종료")
     @SuppressWarnings("unchecked")
@@ -159,6 +155,124 @@ class ReactiveRedisMessageListenerRegistrarTest {
         assertThat(handlerCompleted.get())
                 .as("stop() 반환 시 처리 중인 메시지가 이미 완료되어 있어야 함")
                 .isTrue();
+        assertThat(registrar.isRunning()).isFalse();
+    }
+
+    @Test
+    @DisplayName("메시지 변환 에러: 페이로드 변환 중 예외가 발생해도 스트림이 유지되어야 함")
+    @SuppressWarnings("unchecked")
+    void conversionError_payloadInvalid_logsErrorAndContinuesStream() throws InterruptedException {
+        // Given: 첫 번째 메시지는 에러 유발, 두 번째는 정상
+        Sinks.Many<ReactiveSubscription.Message<String, String>> redisSink =
+                Sinks.many().unicast().onBackpressureBuffer();
+        when(container.receive(any(ChannelTopic.class))).thenReturn(redisSink.asFlux());
+
+        ReactiveSubscription.Message<String, String> errorMsg = mock(ReactiveSubscription.Message.class);
+        ReactiveSubscription.Message<String, String> normalMsg = mock(ReactiveSubscription.Message.class);
+
+        when(errorMsg.getMessage()).thenReturn("invalid-json");
+        when(normalMsg.getMessage()).thenReturn("valid-json");
+
+        // 첫 번째 호출 시 RuntimeException 던짐 (try-catch 블록 검증)
+        when(messageConverter.convert("invalid-json")).thenThrow(new RuntimeException("변환 실패"));
+
+        AlertMessage alertMsg = mock(AlertMessage.class);
+        when(messageConverter.convert("valid-json")).thenReturn(alertMsg);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        when(handler.handle(alertMsg)).thenReturn(Mono.fromRunnable(latch::countDown));
+
+        registrar.register(TOPIC, handler, messageConverter);
+        registrar.start();
+
+        // Act
+        redisSink.tryEmitNext(errorMsg);  // 예외 발생
+        redisSink.tryEmitNext(normalMsg); // 후속 메시지 전송
+
+        // Assert
+        assertThat(latch.await(2, TimeUnit.SECONDS))
+                .as("변환 에러가 발생한 후에도 스트림이 유지되어 다음 메시지를 처리해야 함")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("핸들러 처리 에러: 비즈니스 로직 에러(Mono.error) 발생 시에도 스트림이 유지되어야 함")
+    @SuppressWarnings("unchecked")
+    void handlerError_handleReturnsError_logsErrorAndContinuesStream() throws InterruptedException {
+        // Given
+        Sinks.Many<ReactiveSubscription.Message<String, String>> redisSink =
+                Sinks.many().unicast().onBackpressureBuffer();
+        when(container.receive(any(ChannelTopic.class))).thenReturn(redisSink.asFlux());
+
+        ReactiveSubscription.Message<String, String> msg1 = mock(ReactiveSubscription.Message.class);
+        ReactiveSubscription.Message<String, String> msg2 = mock(ReactiveSubscription.Message.class);
+        when(msg1.getMessage()).thenReturn("p1");
+        when(msg2.getMessage()).thenReturn("p2");
+
+        AlertMessage alertMsg1 = mock(AlertMessage.class);
+        AlertMessage alertMsg2 = mock(AlertMessage.class);
+        when(messageConverter.convert("p1")).thenReturn(alertMsg1);
+        when(messageConverter.convert("p2")).thenReturn(alertMsg2);
+
+        // 첫 번째 핸들러는 Mono 에러 반환 (onErrorResume 블록 검증)
+        when(handler.handle(alertMsg1)).thenReturn(Mono.error(new RuntimeException("핸들러 실패")));
+
+        CountDownLatch latch = new CountDownLatch(1);
+        when(handler.handle(alertMsg2)).thenReturn(Mono.fromRunnable(latch::countDown));
+
+        registrar.register(TOPIC, handler, messageConverter);
+        registrar.start();
+
+        // Act
+        redisSink.tryEmitNext(msg1);
+        redisSink.tryEmitNext(msg2);
+
+        // Assert
+        assertThat(latch.await(2, TimeUnit.SECONDS))
+                .as("핸들러 에러가 발생해도 스트림이 종료되지 않고 다음 데이터를 처리해야 함")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("치명적 스트림 에러: 리시버 자체에서 에러 발생 시 우아하게 종료되어야 함")
+    void criticalStreamError_receiveFails_logsErrorAndCompletesGracefully() {
+        // Given: Redis 연결 끊김 등 스트림 소스 자체가 에러인 상황
+        when(container.receive(any(ChannelTopic.class)))
+                .thenReturn(Flux.error(new RuntimeException("Redis 연결 유실")));
+
+        // Act
+        registrar.register(TOPIC, handler, messageConverter);
+        registrar.start();
+
+        // Assert: doOnError와 onErrorComplete 로직을 통과하고 종료되어야 함
+        registrar.stop();
+        assertThat(registrar.isRunning()).isFalse();
+    }
+
+    @Test
+    @DisplayName("중단 신호 전송: 등록되지 않은 토픽에 대해 signalStop 호출 시 아무 일도 일어나지 않아야 함")
+    void signalStop_nonExistentTopic_doesNothing() {
+        // Given: 아무것도 등록되지 않은 상태
+
+        // When
+        registrar.stop();
+
+        // Then
+        assertThat(registrar.isRunning()).isFalse();
+    }
+
+    @Test
+    @DisplayName("중단 신호 전송: 이미 종료된 토픽에 대해 다시 signalStop 호출 시 안전하게 무시되어야 함")
+    void signalStop_alreadyStoppedTopic_handledGracefully() {
+        // Given
+        registrar.register(TOPIC, handler, messageConverter);
+        registrar.start();
+
+        // When
+        registrar.stop(); // 첫 번째 호출에서 sink가 제거됨
+        registrar.stop(); // 두 번째 호출에서 sink는 null이 됨 (이때 false 분기 실행)
+
+        // Then
         assertThat(registrar.isRunning()).isFalse();
     }
 }

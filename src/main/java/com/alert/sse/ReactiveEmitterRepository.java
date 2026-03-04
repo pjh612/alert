@@ -10,7 +10,7 @@ public class ReactiveEmitterRepository extends InMemoryTagBasedAlertSessionRepos
     public AlertSession<Sinks.Many<ServerSentEvent<Object>>> deleteById(String namespace, String id) {
         AlertSession<Sinks.Many<ServerSentEvent<Object>>> session = super.deleteById(namespace, id);
         if (session != null) {
-            session.engine().tryEmitComplete(); // 리액티브는 명시적 종료가 필수!
+            session.engine().tryEmitComplete();
         }
         return session;
     }

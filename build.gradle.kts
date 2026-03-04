@@ -46,6 +46,7 @@ dependencies {
     testImplementation("com.fasterxml.jackson.core:jackson-databind")
     testImplementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
     testImplementation("org.testcontainers:junit-jupiter:1.20.4")
+    testImplementation("io.micrometer:micrometer-core")
 }
 
 tasks.test {

@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AlertSessionRepository<T> {
-    void put(String namespace, String id, T engine);
+    AlertSession<T> put(String namespace, String id, T engine);
 
     Optional<AlertSession<T>> getById(String namespace, String id);
 

@@ -56,7 +56,6 @@ public class SnowflakeIdGenerator implements IdGenerator<Long> {
         if (now == lastTimestamp) {
             sequence = (sequence + 1) & MAX_SEQUENCE;
             if (sequence == 0) {
-                // 같은 밀리초에 시퀀스 소진 → 다음 ms까지 대기
                 now = waitNextMillis(lastTimestamp);
             }
         } else {

@@ -7,5 +7,5 @@ import reactor.core.publisher.Mono;
 public interface ReactiveAlertCacheManager {
     Mono<Boolean> save(String key, String id, AlertMessage value);
 
-    Flux<? extends AlertMessage> getFromOffset(String key, Long offset, Class<? extends AlertMessage> tClass);
+    Flux<? extends AlertMessage> getFromOffset(String key, String offset, Class<? extends AlertMessage> tClass);
 }
