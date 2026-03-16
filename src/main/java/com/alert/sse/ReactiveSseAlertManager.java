@@ -45,13 +45,14 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
     @Override
     public Flux<ServerSentEvent<Object>> subscribe(AlertChannel channel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
         String namespace = channel.namespace();
+        List<String> safeTags = tags != null ? tags : List.of();
         AlertSession<Sinks.Many<ServerSentEvent<Object>>> deletedSession = repository.deleteById(namespace, subscriberId);
         if(deletedSession != null) {
             deletedSession.engine().tryEmitComplete();
         }
 
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().multicast().onBackpressureBuffer();
-        repository.put(namespace, subscriberId, new HashSet<>(tags), sink);
+        repository.put(namespace, subscriberId, new HashSet<>(safeTags), sink);
 
         AlertMessage connectMsg = alertMessageFactory.onConnect(namespace, subscriberId, null);
         Flux<ServerSentEvent<Object>> connectFlux = Flux.just(
@@ -68,7 +69,7 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
 
         Flux<ServerSentEvent<Object>> recoveryFlux = Flux.empty();
         if (hasOffset) {
-            recoveryFlux = getRecoveryFlux(namespace, subscriberId, tags, lastEventId)
+            recoveryFlux = getRecoveryFlux(namespace, subscriberId, safeTags, lastEventId)
                     .doOnNext(e -> {
                         String eid = e.id();
                         if (eid != null) {

@@ -20,10 +20,12 @@ import com.alert.infra.redis.ReactiveRedisMessageListenerRegistrar;
 import com.alert.infra.redis.RedisAlertCacheManager;
 import com.alert.infra.redis.RedisMessageBroadcaster;
 import com.alert.infra.redis.RedisMessageListenerRegistrar;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -43,10 +45,17 @@ public class AlertRedisConfig {
     @Bean
     @ConditionalOnMissingBean(RedisMessageListenerContainer.class)
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
-    public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory redisConnectionFactory) {
-        RedisMessageListenerContainer redisMessageListenerContainer = new RedisMessageListenerContainer();
-        redisMessageListenerContainer.setConnectionFactory(redisConnectionFactory);
-        return redisMessageListenerContainer;
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            RedisConnectionFactory redisConnectionFactory,
+            ObjectProvider<AsyncTaskExecutor> executorProvider) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.setPhase(Integer.MAX_VALUE - 1);
+        executorProvider.ifAvailable(executor -> {
+            container.setTaskExecutor(executor);
+            container.setSubscriptionExecutor(executor);
+        });
+        return container;
     }
 
     @Bean
@@ -142,9 +151,9 @@ public class AlertRedisConfig {
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "true")
     @ConditionalOnMissingBean(ReactiveAlertMessageListenerRegistrar.class)
     public ReactiveAlertMessageListenerRegistrar<String> reactiveMessageListenerRegistrar(ReactiveRedisMessageListenerContainer redisMessageListenerContainer,
-                                                                                          FanoutAlertMessageSender fanoutAlertMessageSender,
-                                                                                          MessageConverter<String, ? extends AlertMessage> alertMessageConverter,
-                                                                                          AlertProperties alertProperties) {
+                                                                                           FanoutAlertMessageSender fanoutAlertMessageSender,
+                                                                                           MessageConverter<String, ? extends AlertMessage> alertMessageConverter,
+                                                                                           AlertProperties alertProperties) {
         ReactiveRedisMessageListenerRegistrar redisMessageListenerRegistrar = new ReactiveRedisMessageListenerRegistrar(redisMessageListenerContainer);
         List<String> topics = alertProperties.topics();
         for (String topic : topics) {
@@ -154,4 +163,3 @@ public class AlertRedisConfig {
         return redisMessageListenerRegistrar;
     }
 }
-

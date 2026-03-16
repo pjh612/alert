@@ -494,7 +494,77 @@ public interface PartitionKeyStrategy {
   
 
   
-## 7. 테스트 커버리지  
+## 7. Virtual Threads 지원 (Java 21+)
+
+Java 21의 Virtual Threads를 활용하여 블로킹 작업의 스레드 효율을 높일 수 있습니다.
+
+**중요**: Blocking 모드(`alert.reactive=false`, 기본값)에서만 적용됩니다. Reactive 모드에서는 Reactor의 `boundedElastic` 정책을 따릅니다.
+
+### 활성화 방법
+
+Spring Boot 3.2+에서 아래 설정만 추가하면 됩니다:
+
+```yaml
+spring:
+  threads:
+    virtual:
+      enabled: true
+```
+
+Spring Boot가 virtual thread 기반 `AsyncTaskExecutor`를 자동 생성하고, 라이브러리가 `ObjectProvider<AsyncTaskExecutor>`로 감지하여 적용합니다. `AsyncTaskExecutor` 빈이 없으면 동기 실행(현재 스레드)으로 동작합니다.
+
+### 적용 범위
+
+`AsyncTaskExecutor` 빈이 컨텍스트에 존재하면 다음 경로에 적용됩니다:
+
+| 컴포넌트 | 적용 내용 |
+|---------|----------|
+| **SSE (MVC)** | `SseAlertManager` — 구독/발행/재전송을 비동기 디스패치 |
+| **Kafka Consumer** | `ConcurrentKafkaListenerContainerFactory` — 리스너 태스크 실행자 |
+| **Redis Pub/Sub** | `RedisMessageListenerContainer` — 태스크 및 구독 실행자 |
+
+### 커스텀 Executor 사용
+
+별도의 executor 정책(격리/큐잉/제한)이 필요하면 전용 `AsyncTaskExecutor` 빈을 등록하고, `AlertManager`를 직접 선언하여 `@Qualifier`로 주입합니다.
+
+```java
+@Bean("myAlertExecutor")
+AsyncTaskExecutor myAlertExecutor() {
+    SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("my-alert-");
+    executor.setVirtualThreads(true);
+    return executor;
+}
+
+@Bean
+AlertManager customAlertManager(
+        TagBasedAlertSessionRepository<SseEmitter> emitterRepository,
+        AlertCacheManager alertCacheManager,
+        AlertMessageFactory alertMessageFactory,
+        AlertMessagePublisher alertMessagePublisher,
+        AlertMessageSupport alertMessageSupport,
+        @Qualifier("myAlertExecutor") AsyncTaskExecutor executor
+) {
+    return new SseAlertManager(
+            alertMessagePublisher,
+            alertMessageFactory,
+            emitterRepository,
+            alertCacheManager,
+            alertMessageSupport,
+            DefaultAlertMessage.class,
+            executor
+    );
+}
+```
+
+### 주의사항
+
+- `AsyncTaskExecutor` 빈이 없으면 기존과 동일하게 동기 실행됩니다. 기존 동작에 영향을 주지 않습니다.
+- Kafka의 경우 Virtual Threads는 **poll/listener 스레드**에 적용되며, per-record 병렬 처리는 아닙니다.
+- Java 21 이상이 필요합니다.
+
+---
+
+## 8. 테스트 커버리지  
 
 Jacoco를 활용해 테스트 커버리지를 측정하고, 부족한 테스트 커버리지를 지속적으로 개선해 커버리지를 91%로 끌어올렸으며 지속적으로 보충할 예정입니다.
 

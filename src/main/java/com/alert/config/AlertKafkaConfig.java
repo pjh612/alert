@@ -35,6 +35,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -148,10 +149,14 @@ public class AlertKafkaConfig {
 
     @Bean("alertKafkaListenerContainerFactory")
     @ConditionalOnProperty(name = "alert.reactive", havingValue = "false", matchIfMissing = true)
-    public ConcurrentKafkaListenerContainerFactory<String, AlertMessage> alertKafkaListenerContainerFactory(@Qualifier("alertConsumerFactory") ConsumerFactory<String, AlertMessage> alertConsumerFactory) {
+    public ConcurrentKafkaListenerContainerFactory<String, AlertMessage> alertKafkaListenerContainerFactory(
+            @Qualifier("alertConsumerFactory") ConsumerFactory<String, AlertMessage> alertConsumerFactory,
+            ObjectProvider<AsyncTaskExecutor> executorProvider) {
         ConcurrentKafkaListenerContainerFactory<String, AlertMessage> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(alertConsumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        factory.setPhase(Integer.MAX_VALUE);
+        executorProvider.ifAvailable(executor -> factory.getContainerProperties().setListenerTaskExecutor(executor));
         return factory;
     }
 

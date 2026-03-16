@@ -80,7 +80,8 @@ class SseAlertManagerTest {
                 emitterRepository,
                 alertCacheManager,
                 support,
-                DefaultAlertMessage.class
+                DefaultAlertMessage.class,
+                Runnable::run
         );
 
         channel = () -> NAMESPACE;

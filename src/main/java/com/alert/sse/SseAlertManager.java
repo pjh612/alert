@@ -20,29 +20,33 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Executor;
 
 public class SseAlertManager extends AbstractAlertManager implements SubscribableAlertManager<SseEmitter> {
     private final TagBasedAlertSessionRepository<SseEmitter> emitterRepository;
     private final AlertCacheManager alertCacheManager;
     private final AlertMessageSupport support;
     private final Class<? extends AlertMessage> messageType;
+    private final Executor dispatchExecutor;
 
     private static final Logger log = LoggerFactory.getLogger(SseAlertManager.class);
 
-    public SseAlertManager(AlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<SseEmitter> emitterRepository, AlertCacheManager alertCacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType) {
+    public SseAlertManager(AlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<SseEmitter> emitterRepository, AlertCacheManager alertCacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, Executor dispatchExecutor) {
         super(alertMessageFactory, alertMessagePublisher);
         this.emitterRepository = emitterRepository;
         this.alertCacheManager = alertCacheManager;
         this.support = support;
         this.messageType = messageType;
+        this.dispatchExecutor = dispatchExecutor;
     }
 
     @Override
     public SseEmitter subscribe(AlertChannel alertChannel, String subscriberId, List<String> tags, String lastEventId, Long timeoutMillis) {
         String namespace = alertChannel.namespace();
         SseEmitter emitter = new SseEmitter(timeoutMillis);
+        List<String> safeTags = tags != null ? tags : List.of();
 
-        AlertSession<SseEmitter> old = emitterRepository.put(namespace, subscriberId, new HashSet<>(tags), emitter);
+        AlertSession<SseEmitter> old = emitterRepository.put(namespace, subscriberId, new HashSet<>(safeTags), emitter);
         if (old != null) {
             try {
                 old.engine().complete();
@@ -55,10 +59,10 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
         emitter.onError(e -> handleEmitterError(namespace, subscriberId, emitter, e));
 
         AlertMessage connectMsg = alertMessageFactory.onConnect(namespace, subscriberId, null);
-        alertMessagePublisher.publish(alertChannel.name(), connectMsg);
+        dispatchExecutor.execute(() -> alertMessagePublisher.publish(alertChannel.name(), connectMsg));
 
         if (isReconnected(lastEventId)) {
-            replayMissedMessages(emitter, alertChannel.namespace(), subscriberId, tags, lastEventId);
+            dispatchExecutor.execute(() -> replayMissedMessages(emitter, alertChannel.namespace(), subscriberId, safeTags, lastEventId));
         }
 
         return emitter;

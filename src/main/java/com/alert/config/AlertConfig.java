@@ -36,6 +36,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
@@ -43,6 +44,7 @@ import reactor.core.publisher.Sinks;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.concurrent.Executor;
 
 @EnableConfigurationProperties(AlertProperties.class)
 @Import({EmitterRepositoryConfig.class, AlertRedisConfig.class, AlertKafkaConfig.class})
@@ -63,8 +65,10 @@ public class AlertConfig {
             AlertCacheManager alertCacheManager,
             AlertMessageFactory alertMessageConverter,
             AlertMessagePublisher alertMessagePublisher,
-            AlertMessageSupport alertMessageSupport) {
-        return new SseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, alertMessageSupport, DefaultAlertMessage.class);
+            AlertMessageSupport alertMessageSupport,
+            ObjectProvider<AsyncTaskExecutor> executorProvider) {
+        Executor executor = executorProvider.getIfAvailable(() -> Runnable::run);
+        return new SseAlertManager(alertMessagePublisher, alertMessageConverter, emitterRepository, alertCacheManager, alertMessageSupport, DefaultAlertMessage.class, executor);
     }
 
     @Bean
@@ -141,4 +145,5 @@ public class AlertConfig {
     public IdGenerator<?> idGenerator() {
         return new SnowflakeIdGenerator(properties.nodeId());
     }
+
 }
