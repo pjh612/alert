@@ -56,6 +56,16 @@ class AlertMessageSupportTest {
     }
 
     @Test
+    @DisplayName("resolveCacheKey: BROADCAST 타깃의 캐시 키 생성")
+    void resolveCacheKey_broadcastTarget_returnsCorrectKey() {
+        AlertTarget target = AlertTarget.broadcast();
+
+        String key = support.resolveCacheKey("test-ns", target);
+
+        assertThat(key).isEqualTo("alert:test-ns:broadcast:*");
+    }
+
+    @Test
     @DisplayName("resolveOffsetKey: 오프셋 키 생성")
     void resolveOffsetKey_returnsCorrectKey() {
         String key = support.resolveOffsetKey("test-ns", "user1");
