@@ -21,6 +21,7 @@ import com.alert.infra.redis.RedisAlertCacheManager;
 import com.alert.infra.redis.RedisMessageBroadcaster;
 import com.alert.infra.redis.RedisMessageListenerRegistrar;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -40,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 
 @Configuration
+@ConditionalOnClass(RedisConnectionFactory.class)
 public class AlertRedisConfig {
 
     @Bean

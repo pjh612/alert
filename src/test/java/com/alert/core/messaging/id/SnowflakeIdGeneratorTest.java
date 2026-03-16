@@ -1,4 +1,4 @@
-package com.alert.core.messaging.broadcaster;
+package com.alert.core.messaging.id;
 
 import com.alert.core.messaging.id.SnowflakeIdGenerator;
 import org.junit.jupiter.api.DisplayName;

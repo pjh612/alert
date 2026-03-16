@@ -1,1 +1,4 @@
 com.alert.config.AlertConfig
+com.alert.config.AlertRedisConfig
+com.alert.config.AlertKafkaConfig
+com.alert.config.AlertReactiveKafkaConfig

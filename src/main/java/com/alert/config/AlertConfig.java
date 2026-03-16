@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 
 @EnableConfigurationProperties(AlertProperties.class)
-@Import({EmitterRepositoryConfig.class, AlertRedisConfig.class, AlertKafkaConfig.class})
+@Import(EmitterRepositoryConfig.class)
 @Configuration
 public class AlertConfig {
 
