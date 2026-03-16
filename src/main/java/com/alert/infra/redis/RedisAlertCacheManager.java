@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import tools.jackson.databind.ObjectMapper;
 
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,17 @@ public class RedisAlertCacheManager implements AlertCacheManager {
             log.debug("Saved alert message with id {} and value {}", id, value);
         }
         return result;
+    }
+
+    @Override
+    public void saveAll(List<String> keys, String id, AlertMessage value) {
+        String json = objectMapper.writeValueAsString(value);
+        double score = Double.parseDouble(id);
+
+        for (String key : keys) {
+            messageCache.opsForZSet().add(key, json, score);
+            messageCache.expire(key, Duration.ofSeconds(cacheTtlSeconds));
+        }
     }
 
     @Override

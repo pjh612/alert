@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import java.util.List;
+
 public class KafkaMessagePublisher implements AlertMessagePublisher {
     private static final Logger log = LoggerFactory.getLogger(KafkaMessagePublisher.class);
 
@@ -30,10 +32,11 @@ public class KafkaMessagePublisher implements AlertMessagePublisher {
         }
 
         if (message.type().isCacheable()) {
-            message.targets().forEach(target -> {
-                String cacheKey = support.resolveCacheKey(message.namespace(), target);
-                alertCacheManager.save(cacheKey, message.id(), message);
-            });
+            List<String> cacheKeys = message.targets()
+                    .stream()
+                    .map(target -> support.resolveCacheKey(message.namespace(), target))
+                    .toList();
+            alertCacheManager.saveAll(cacheKeys, message.id(), message);
         }
 
         String partitionKey = partitionKeyStrategy.resolve(message);

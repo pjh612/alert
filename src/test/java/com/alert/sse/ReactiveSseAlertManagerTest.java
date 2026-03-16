@@ -214,6 +214,60 @@ class ReactiveSseAlertManagerTest {
                 .verify();
     }
 
+    @Test
+    @DisplayName("sortRecovery=false일 때 복구 메시지가 정렬되지 않는다 (캐시 반환 순서 유지)")
+    void recovery_withoutSort_preservesOriginalOrder() {
+        AlertMessage msg102 = new com.alert.core.messaging.model.DefaultAlertMessage(
+                "102", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                DefaultAlertMessageType.MESSAGE, "b1", false, null);
+        AlertMessage msg100 = new com.alert.core.messaging.model.DefaultAlertMessage(
+                "100", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                DefaultAlertMessageType.MESSAGE, "b2", false, null);
+
+        // 102가 100보다 먼저 반환
+        doReturn(Flux.just(msg102, msg100))
+                .when(alertCacheManager).getFromOffset(any(), eq("99"), any());
+
+        Flux<ServerSentEvent<Object>> result = manager.subscribe(() -> NAMESPACE, SUBSCRIBER_ID, List.of(), "99", 5000L);
+
+        StepVerifier.create(result)
+                .expectNextMatches(e -> e.event().equals("CONNECT"))
+                .expectNextMatches(e -> e.id().equals("102"))
+                .expectNextMatches(e -> e.id().equals("100"))
+                .thenCancel()
+                .verify();
+    }
+
+    @Test
+    @DisplayName("sortRecovery=true일 때 복구 메시지가 idComparator로 정렬된다")
+    void recovery_withSort_sortsMessages() {
+        ReactiveSseAlertManager sortedManager = new ReactiveSseAlertManager(
+                alertMessagePublisher, alertMessageFactory, repository,
+                alertCacheManager, support, AlertMessage.class,
+                new DefaultIdComparator(), true
+        );
+        lenient().when(support.resolveCacheKey(eq(NAMESPACE), any(AlertTarget.class))).thenReturn("cache-key");
+
+        AlertMessage msg102 = new com.alert.core.messaging.model.DefaultAlertMessage(
+                "102", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                DefaultAlertMessageType.MESSAGE, "b1", false, null);
+        AlertMessage msg100 = new com.alert.core.messaging.model.DefaultAlertMessage(
+                "100", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)),
+                DefaultAlertMessageType.MESSAGE, "b2", false, null);
+
+        doReturn(Flux.just(msg102, msg100))
+                .when(alertCacheManager).getFromOffset(any(), eq("99"), any());
+
+        Flux<ServerSentEvent<Object>> result = sortedManager.subscribe(() -> NAMESPACE, SUBSCRIBER_ID, List.of(), "99", 5000L);
+
+        StepVerifier.create(result)
+                .expectNextMatches(e -> e.event().equals("CONNECT"))
+                .expectNextMatches(e -> e.id().equals("100"))
+                .expectNextMatches(e -> e.id().equals("102"))
+                .thenCancel()
+                .verify();
+    }
+
     // --- Helper Methods ---
 
     private AlertMessage createMsg(String data) {

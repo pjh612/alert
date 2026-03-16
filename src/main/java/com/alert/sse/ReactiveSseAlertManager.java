@@ -18,9 +18,10 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import com.alert.core.comparator.IdComparator;
+
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,16 +31,22 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
     private final ReactiveAlertCacheManager cacheManager;
     private final AlertMessageSupport support;
     private final Class<? extends AlertMessage> messageType;
-    private final Comparator<String> idComparator;
+    private final IdComparator idComparator;
+    private final boolean sortRecovery;
     private static final Logger log = LoggerFactory.getLogger(ReactiveSseAlertManager.class);
 
-    public ReactiveSseAlertManager(ReactiveAlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository, ReactiveAlertCacheManager cacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, Comparator<String> idComparator) {
+    public ReactiveSseAlertManager(ReactiveAlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository, ReactiveAlertCacheManager cacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, IdComparator idComparator) {
+        this(alertMessagePublisher, alertMessageFactory, repository, cacheManager, support, messageType, idComparator, false);
+    }
+
+    public ReactiveSseAlertManager(ReactiveAlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<Sinks.Many<ServerSentEvent<Object>>> repository, ReactiveAlertCacheManager cacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, IdComparator idComparator, boolean sortRecovery) {
         super(alertMessageFactory, alertMessagePublisher);
         this.repository = repository;
         this.cacheManager = cacheManager;
         this.support = support;
         this.messageType = messageType;
         this.idComparator = idComparator;
+        this.sortRecovery = sortRecovery;
     }
 
     @Override
@@ -103,10 +110,14 @@ public class ReactiveSseAlertManager extends ReactiveAbstractAlertManager implem
         tags.forEach(tag -> sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.tag(tag)), offset, messageType)));
         sources.add(cacheManager.getFromOffset(support.resolveCacheKey(namespace, AlertTarget.broadcast()), offset, messageType));
 
-        return Flux.merge(sources)
+        Flux<? extends AlertMessage> merged = Flux.merge(sources)
                 .filter(m -> m.id() != null)
-                .distinct(AlertMessage::id)
-                .sort((m1, m2) -> idComparator.compare(m1.id(), m2.id()))
-                .map(msg -> ServerSentEvent.builder().id(msg.id()).event(msg.type().toString()).data(msg.body()).build());
+                .distinct(AlertMessage::id);
+
+        if (sortRecovery) {
+            merged = merged.sort((m1, m2) -> idComparator.compare(m1.id(), m2.id()));
+        }
+
+        return merged.map(msg -> ServerSentEvent.builder().id(msg.id()).event(msg.type().toString()).data(msg.body()).build());
     }
 }

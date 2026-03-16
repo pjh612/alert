@@ -7,8 +7,9 @@ import com.alert.core.messaging.publisher.ReactiveAlertMessagePublisher;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderRecord;
 
@@ -45,12 +46,11 @@ public class ReactiveKafkaAlertMessagePublisher implements ReactiveAlertMessageP
             return Mono.empty();
         }
 
-        return Flux.fromIterable(message.targets())
-                .flatMap(target -> {
-                    String cacheKey = support.resolveCacheKey(message.namespace(), target);
-                    return alertCacheManager.save(cacheKey, eventId, message);
-                })
-                .then()
+        List<String> cacheKeys = message.targets().stream()
+                .map(target -> support.resolveCacheKey(message.namespace(), target))
+                .toList();
+
+        return alertCacheManager.saveAll(cacheKeys, eventId, message)
                 .onErrorResume(e -> {
                     log.error("Cache save failed for eventId: {}", eventId, e);
                     return Mono.empty();

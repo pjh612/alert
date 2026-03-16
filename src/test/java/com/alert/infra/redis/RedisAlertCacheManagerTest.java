@@ -17,6 +17,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 
+import org.mockito.ArgumentCaptor;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -65,6 +67,39 @@ class RedisAlertCacheManagerTest {
         assertThat(result).isTrue();
         verify(zSetOps).add(eq(CACHE_KEY), anyString(), eq(Double.parseDouble(MSG_ID)));
         verify(messageCache).expire(eq(CACHE_KEY), any());
+    }
+
+    @Test
+    @DisplayName("saveAll: JSON 직렬화 1회로 여러 키에 ZADD + EXPIRE 호출")
+    void saveAll_serializesOnceAndWritesToAllKeys() {
+        AlertMessage msg = createMessage(MSG_ID);
+        List<String> keys = List.of("key1", "key2", "key3");
+        double expectedScore = Double.parseDouble(MSG_ID);
+
+        cacheManager.saveAll(keys, MSG_ID, msg);
+
+        verify(zSetOps, times(3)).add(anyString(), anyString(), eq(expectedScore));
+        verify(messageCache, times(3)).expire(anyString(), any());
+
+        for (String key : keys) {
+            verify(zSetOps).add(eq(key), anyString(), eq(expectedScore));
+            verify(messageCache).expire(eq(key), any());
+        }
+    }
+
+    @Test
+    @DisplayName("saveAll: 모든 키에 동일한 JSON 값이 저장된다")
+    void saveAll_writesIdenticalJsonToAllKeys() {
+        AlertMessage msg = createMessage(MSG_ID);
+        List<String> keys = List.of("key1", "key2");
+
+        ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+
+        cacheManager.saveAll(keys, MSG_ID, msg);
+
+        verify(zSetOps, times(2)).add(anyString(), jsonCaptor.capture(), anyDouble());
+        List<String> capturedJsons = jsonCaptor.getAllValues();
+        assertThat(capturedJsons.get(0)).isEqualTo(capturedJsons.get(1));
     }
 
     @Test

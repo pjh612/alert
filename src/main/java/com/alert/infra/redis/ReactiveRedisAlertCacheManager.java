@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.List;
 
 public class ReactiveRedisAlertCacheManager implements ReactiveAlertCacheManager {
     private final ReactiveRedisTemplate<String, String> redisTemplate;
@@ -26,6 +27,18 @@ public class ReactiveRedisAlertCacheManager implements ReactiveAlertCacheManager
         return redisTemplate.opsForZSet()
                 .add(key, objectMapper.writeValueAsString(value), Double.parseDouble(id))
                 .flatMap(result -> redisTemplate.expire(key, Duration.ofSeconds(cacheTtlSeconds)).thenReturn(result));
+    }
+
+    @Override
+    public Mono<Void> saveAll(List<String> keys, String id, AlertMessage value) {
+        String json = objectMapper.writeValueAsString(value);
+        double score = Double.parseDouble(id);
+
+        return Flux.fromIterable(keys)
+                .flatMap(key -> redisTemplate.opsForZSet()
+                        .add(key, json, score)
+                        .then(redisTemplate.expire(key, Duration.ofSeconds(cacheTtlSeconds))))
+                .then();
     }
 
     @Override

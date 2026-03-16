@@ -270,6 +270,65 @@ class SseAlertManagerTest {
         }
     }
 
+    @Test
+    @DisplayName("recoverySortComparator가 없으면 캐시 반환 순서(삽입 순서)대로 전송된다")
+    void replay_withoutComparator_preservesInsertionOrder() throws Exception {
+        try (MockedConstruction<SseEmitter> mocked = mockConstruction(SseEmitter.class)) {
+            AlertMessage msg103 = new DefaultAlertMessage("103", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)), DefaultAlertMessageType.MESSAGE, "b1", false, null);
+            AlertMessage msg101 = new DefaultAlertMessage("101", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)), DefaultAlertMessageType.MESSAGE, "b2", false, null);
+
+            when(alertMessageFactory.onConnect(any(), any(), any())).thenReturn(mock(AlertMessage.class));
+            when(support.resolveCacheKey(eq(NAMESPACE), eq(AlertTarget.id(SUBSCRIBER_ID)))).thenReturn(CACHE_KEY);
+            when(support.resolveCacheKey(eq(NAMESPACE), eq(AlertTarget.broadcast()))).thenReturn(BROADCAST_KEY);
+
+            // user 캐시에서 103 → 101 순서로 반환
+            doReturn(List.of(msg103, msg101)).when(alertCacheManager).getFromOffset(eq(CACHE_KEY), any(), any());
+            doReturn(List.of()).when(alertCacheManager).getFromOffset(eq(BROADCAST_KEY), any(), any());
+
+            manager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L);
+
+            SseEmitter mockEmitter = mocked.constructed().get(0);
+            ArgumentCaptor<SseEmitter.SseEventBuilder> captor = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+            verify(mockEmitter, times(2)).send(captor.capture());
+
+            // 삽입 순서 유지: 103 → 101
+            List<SseEmitter.SseEventBuilder> events = captor.getAllValues();
+            assertThat(events).hasSize(2);
+        }
+    }
+
+    @Test
+    @DisplayName("recoverySortComparator가 제공되면 정렬된 순서로 전송된다")
+    void replay_withComparator_sendsSorted() throws Exception {
+        try (MockedConstruction<SseEmitter> mocked = mockConstruction(SseEmitter.class)) {
+            SseAlertManager sortedManager = new SseAlertManager(
+                    alertMessagePublisher, alertMessageFactory, emitterRepository,
+                    alertCacheManager, support, DefaultAlertMessage.class,
+                    Runnable::run, new com.alert.core.comparator.DefaultIdComparator()
+            );
+
+            AlertMessage msg103 = new DefaultAlertMessage("103", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)), DefaultAlertMessageType.MESSAGE, "b1", false, null);
+            AlertMessage msg101 = new DefaultAlertMessage("101", NAMESPACE, List.of(AlertTarget.id(SUBSCRIBER_ID)), DefaultAlertMessageType.MESSAGE, "b2", false, null);
+
+            when(alertMessageFactory.onConnect(any(), any(), any())).thenReturn(mock(AlertMessage.class));
+            when(support.resolveCacheKey(eq(NAMESPACE), eq(AlertTarget.id(SUBSCRIBER_ID)))).thenReturn(CACHE_KEY);
+            when(support.resolveCacheKey(eq(NAMESPACE), eq(AlertTarget.broadcast()))).thenReturn(BROADCAST_KEY);
+
+            doReturn(List.of(msg103, msg101)).when(alertCacheManager).getFromOffset(eq(CACHE_KEY), any(), any());
+            doReturn(List.of()).when(alertCacheManager).getFromOffset(eq(BROADCAST_KEY), any(), any());
+
+            sortedManager.subscribe(channel, SUBSCRIBER_ID, List.of(), "100", 30000L);
+
+            SseEmitter mockEmitter = mocked.constructed().get(0);
+            ArgumentCaptor<SseEmitter.SseEventBuilder> captor = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+            verify(mockEmitter, times(2)).send(captor.capture());
+
+            // DefaultIdComparator로 정렬: 101 → 103
+            List<SseEmitter.SseEventBuilder> events = captor.getAllValues();
+            assertThat(events).hasSize(2);
+        }
+    }
+
     // Helper method
     private AlertMessage createMockMessage(String id, String body) {
         AlertMessage msg = mock(AlertMessage.class);

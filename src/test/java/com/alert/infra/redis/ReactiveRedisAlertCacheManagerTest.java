@@ -73,6 +73,44 @@ class ReactiveRedisAlertCacheManagerTest {
     }
 
     @Test
+    @DisplayName("saveAll: JSON 직렬화 1회로 여러 키에 ZADD + EXPIRE 호출")
+    void saveAll_serializesOnceAndWritesToAllKeys() {
+        AlertMessage msg = createMessage(MSG_ID);
+        List<String> keys = List.of("key1", "key2", "key3");
+        double expectedScore = Double.parseDouble(MSG_ID);
+
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(zSetOps.add(anyString(), anyString(), eq(expectedScore))).thenReturn(Mono.just(true));
+        when(redisTemplate.expire(anyString(), any())).thenReturn(Mono.just(true));
+
+        StepVerifier.create(cacheManager.saveAll(keys, MSG_ID, msg))
+                .verifyComplete();
+
+        verify(zSetOps, times(3)).add(anyString(), anyString(), eq(expectedScore));
+        verify(redisTemplate, times(3)).expire(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("saveAll: 모든 키에 동일한 JSON 값이 저장된다")
+    void saveAll_writesIdenticalJsonToAllKeys() {
+        AlertMessage msg = createMessage(MSG_ID);
+        List<String> keys = List.of("key1", "key2");
+
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(zSetOps.add(anyString(), anyString(), anyDouble())).thenReturn(Mono.just(true));
+        when(redisTemplate.expire(anyString(), any())).thenReturn(Mono.just(true));
+
+        org.mockito.ArgumentCaptor<String> jsonCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        StepVerifier.create(cacheManager.saveAll(keys, MSG_ID, msg))
+                .verifyComplete();
+
+        verify(zSetOps, times(2)).add(anyString(), jsonCaptor.capture(), anyDouble());
+        List<String> capturedJsons = jsonCaptor.getAllValues();
+        org.assertj.core.api.Assertions.assertThat(capturedJsons.get(0)).isEqualTo(capturedJsons.get(1));
+    }
+
+    @Test
     @DisplayName("getFromOffset: offset 이후 메시지 조회")
     void getFromOffset_returnsMessagesAfterOffset() throws Exception {
         AlertMessage msg = createMessage(MSG_ID);

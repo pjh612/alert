@@ -47,6 +47,7 @@ class ReactiveKafkaAlertMessagePublisherTest {
                 alertCacheManager, support, kafkaSender, partitionKeyStrategy);
 
         when(support.resolveCacheKey(any(), any())).thenReturn("cache-key");
+        when(alertCacheManager.saveAll(any(), any(), any())).thenReturn(Mono.empty());
         when(partitionKeyStrategy.resolve(any())).thenReturn("partition-key");
     }
 
@@ -110,6 +111,6 @@ class ReactiveKafkaAlertMessagePublisherTest {
         StepVerifier.create(publisher.publish(TOPIC, msg))
                 .verifyComplete();
 
-        verify(alertCacheManager, never()).save(any(), any(), any());
+        verify(alertCacheManager, never()).saveAll(any(), any(), any());
     }
 }

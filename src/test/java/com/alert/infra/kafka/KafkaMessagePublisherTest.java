@@ -23,6 +23,8 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +65,31 @@ class KafkaMessagePublisherTest {
         publisher.publish(TOPIC, msg);
 
         verify(kafkaTemplate).send(TOPIC, null, msg);
+    }
+
+    @Test
+    @DisplayName("publish: cacheable 메시지는 saveAll로 캐시에 저장된다")
+    void publish_cacheable_callsSaveAll() {
+        AlertMessage msg = createMessage();
+        when(support.resolveCacheKey(any(), any())).thenReturn("cache-key");
+
+        publisher.publish(TOPIC, msg);
+
+        verify(alertCacheManager).saveAll(any(), eq(MSG_ID), eq(msg));
+        verify(alertCacheManager, never()).save(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("publish: non-cacheable 메시지는 캐시 저장을 하지 않는다")
+    void publish_nonCacheable_skipsSaveAll() {
+        AlertMessage msg = new DefaultAlertMessage(
+                MSG_ID, NAMESPACE, List.of(AlertTarget.id("user1")),
+                DefaultAlertMessageType.CONNECT, "connect", false, null);
+
+        publisher.publish(TOPIC, msg);
+
+        verify(alertCacheManager, never()).saveAll(any(), any(), any());
+        verify(alertCacheManager, never()).save(any(), any(), any());
     }
 
     @Test

@@ -16,7 +16,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.alert.core.comparator.IdComparator;
+import org.jspecify.annotations.Nullable;
+
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -28,16 +32,22 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
     private final AlertMessageSupport support;
     private final Class<? extends AlertMessage> messageType;
     private final Executor dispatchExecutor;
+    private final @Nullable IdComparator recoverySortComparator;
 
     private static final Logger log = LoggerFactory.getLogger(SseAlertManager.class);
 
     public SseAlertManager(AlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<SseEmitter> emitterRepository, AlertCacheManager alertCacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, Executor dispatchExecutor) {
+        this(alertMessagePublisher, alertMessageFactory, emitterRepository, alertCacheManager, support, messageType, dispatchExecutor, null);
+    }
+
+    public SseAlertManager(AlertMessagePublisher alertMessagePublisher, AlertMessageFactory alertMessageFactory, TagBasedAlertSessionRepository<SseEmitter> emitterRepository, AlertCacheManager alertCacheManager, AlertMessageSupport support, Class<? extends AlertMessage> messageType, Executor dispatchExecutor, @Nullable IdComparator recoverySortComparator) {
         super(alertMessageFactory, alertMessagePublisher);
         this.emitterRepository = emitterRepository;
         this.alertCacheManager = alertCacheManager;
         this.support = support;
         this.messageType = messageType;
         this.dispatchExecutor = dispatchExecutor;
+        this.recoverySortComparator = recoverySortComparator;
     }
 
     @Override
@@ -80,7 +90,9 @@ public class SseAlertManager extends AbstractAlertManager implements Subscribabl
     }
 
     private void replayMissedMessages(SseEmitter emitter, String namespace, String subscriberId, List<String> tags, String lastEventId) {
-        Map<String, AlertMessage> mergedMessages = new TreeMap<>();
+        Map<String, AlertMessage> mergedMessages = recoverySortComparator != null
+                ? new TreeMap<>(recoverySortComparator)
+                : new LinkedHashMap<>();
 
         fetchAndMerge(mergedMessages, namespace, AlertTarget.id(subscriberId), lastEventId);
         for (String tag : tags) {
